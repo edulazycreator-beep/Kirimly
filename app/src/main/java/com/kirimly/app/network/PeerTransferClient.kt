@@ -287,7 +287,7 @@ class PeerTransferClient(
             }
             if (key != null && !init.encrypted) throw IOException(tr(R.string.s_peer_menolak_enkripsi))
 
-            val chunkSize = init.chunkSize.coerceIn(256 * 1024, 8 * 1024 * 1024)
+            val chunkSize = init.chunkSize.coerceIn(256 * 1024, 16 * 1024 * 1024)
             val buffer = ByteArray(chunkSize)
             reader.seekTo(init.offset)
             var failures = 0
@@ -296,13 +296,11 @@ class PeerTransferClient(
                 if (length == 0) break
                 val offset = reader.position
                 val payload = if (key != null) TransferCrypto.encrypt(key, buffer, length) else buffer.copyOf(length)
-                val chunkSha = TransferCrypto.sha256Hex(buffer, length)
                 val outcome = try {
                     val response = client.post("$base/api/upload/chunk") {
                         identify()
                         parameter("id", init.uploadId)
                         parameter("offset", offset.toString())
-                        header(KirimlyServerManager.CHUNK_SHA_HEADER, chunkSha)
                         contentType(ContentType.Application.OctetStream)
                         setBody(payload)
                         timeout {

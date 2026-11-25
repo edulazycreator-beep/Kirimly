@@ -109,6 +109,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         (application as KirimlyApplication).container.appInForeground.value = true
+        // Receiving is always on while Kirimly is open (it may have stopped itself while idle).
+        viewModel.ensureServerRunning()
     }
 
     override fun onStop() {

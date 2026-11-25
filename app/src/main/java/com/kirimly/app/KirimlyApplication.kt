@@ -5,10 +5,7 @@ import android.app.Application
 import android.content.Context
 import com.kirimly.app.data.db.KirimlyDatabase
 import com.kirimly.app.data.prefs.UserPreferencesRepository
-import com.kirimly.app.network.HotspotManager
 import com.kirimly.app.network.KirimlyServerManager
-import com.kirimly.app.network.NearbyTransferManager
-import com.kirimly.app.network.WifiJoiner
 import com.kirimly.app.network.NsdDiscoveryManager
 import com.kirimly.app.network.PeerTransferClient
 import com.kirimly.app.network.SharedFileCache
@@ -57,10 +54,7 @@ class AppContainer(context: Context) {
         PeerTransferClient(appContext, database.transferDao(), transferTracker)
     val nsdManager: NsdDiscoveryManager =
         NsdDiscoveryManager(appContext, appScope) { host, port -> peerClient.fetchInfo(host, port) }
-    val hotspotManager: HotspotManager = HotspotManager(appContext)
-    val nearbyManager: NearbyTransferManager =
-        NearbyTransferManager(appContext, appScope, database.transferDao(), transferTracker, serverManager)
-    val wifiJoiner: WifiJoiner = WifiJoiner(appContext)
+
 
     init {
         appScope.launch(Dispatchers.IO) {
@@ -72,10 +66,6 @@ class AppContainer(context: Context) {
                 serverManager.updatePreferences(prefs)
                 peerClient.deviceId = prefs.deviceId
                 nsdManager.updateLocalName(prefs.deviceNickname)
-                val renamed = nearbyManager.localName != prefs.deviceNickname
-                nearbyManager.localName = prefs.deviceNickname
-                nearbyManager.localDeviceId = prefs.deviceId
-                if (renamed && nearbyManager.active.value) nearbyManager.restart()
             }
         }
     }

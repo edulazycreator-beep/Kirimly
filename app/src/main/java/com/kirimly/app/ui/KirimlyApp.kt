@@ -20,7 +20,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
-import com.kirimly.app.data.model.QrMode
 import com.kirimly.app.data.model.ServerState
 import com.kirimly.app.ui.components.AnimatedKirimlyMark
 import android.content.pm.PackageManager
@@ -131,7 +130,7 @@ fun KirimlyApp(viewModel: MainViewModel) {
     }
 
     // ---- Server on by default while the app is open (can be turned off in settings) ----
-    LaunchedEffect(Unit) { viewModel.maybeAutoStartServer() }
+    LaunchedEffect(Unit) { viewModel.ensureServerRunning() }
 
     // ---- One-shot UI events ----
     LaunchedEffect(Unit) {
@@ -218,7 +217,6 @@ fun KirimlyApp(viewModel: MainViewModel) {
                         viewModel = viewModel,
                         onOpenSettings = { showSettings = true },
                         onOpenReceive = {
-                            viewModel.setQrMode(QrMode.WIFI_HOTSPOT)
                             navController.navigate(MainViewModel.ROUTE_RECEIVE) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
@@ -275,12 +273,7 @@ fun KirimlyApp(viewModel: MainViewModel) {
             onThemeModeChange = viewModel::setThemeMode,
             onPaletteChange = viewModel::setPalette,
             onNicknameChange = viewModel::setNickname,
-            onPinRequiredChange = viewModel::setPinRequired,
-            onAutoStartChange = viewModel::setAutoStartServer,
-            onPinInQrChange = viewModel::setPinInQr,
-            onConvertHeicChange = viewModel::setConvertHeic,
             onRemoveTrusted = viewModel::removeTrustedDevice,
-            onIdleStopChange = viewModel::setIdleStopMinutes,
             crashLogCount = crashLogCount,
             onShareCrashLogs = {
                 scope.launch {
@@ -297,7 +290,6 @@ fun KirimlyApp(viewModel: MainViewModel) {
                     }
                 }
             },
-            onClearCrashLogs = viewModel::clearCrashLogs,
             onShowTutorial = {
                 showSettings = false
                 viewModel.replayOnboarding()

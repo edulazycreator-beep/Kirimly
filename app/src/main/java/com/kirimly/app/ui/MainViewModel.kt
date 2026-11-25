@@ -1,31 +1,23 @@
 package com.kirimly.app.ui
 
-import com.kirimly.app.R
-import com.kirimly.app.util.tr
-import android.Manifest
 import android.app.Application
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
-import com.kirimly.app.network.WifiJoiner
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kirimly.app.KirimlyApplication
-import androidx.core.content.FileProvider
+import com.kirimly.app.R
 import com.kirimly.app.data.model.AppPalette
 import com.kirimly.app.data.model.ConnectedBrowser
-import com.kirimly.app.util.CrashLogger
 import com.kirimly.app.data.model.HistoryFilter
-import com.kirimly.app.data.model.HotspotState
 import com.kirimly.app.data.model.PeerDevice
 import com.kirimly.app.data.model.PeerSendResult
 import com.kirimly.app.data.model.PendingTransferRequest
-import com.kirimly.app.data.model.QrMode
 import com.kirimly.app.data.model.ServerState
 import com.kirimly.app.data.model.SharedItem
 import com.kirimly.app.data.model.SharedText
@@ -36,28 +28,28 @@ import com.kirimly.app.data.model.TransferProgress
 import com.kirimly.app.data.model.UserPreferences
 import com.kirimly.app.data.prefs.UserPreferencesRepository
 import com.kirimly.app.network.NetworkUtils
-import com.kirimly.app.network.QrCodeGenerator
-import com.kirimly.app.network.SharedFileCache
 import com.kirimly.app.network.ServerEvent
+import com.kirimly.app.network.SharedFileCache
 import com.kirimly.app.service.TransferForegroundService
+import com.kirimly.app.util.CrashLogger
+import com.kirimly.app.util.tr
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-/** Single source of truth for the UI: service state, queue, peers, approvals, history and settings. */
+/** Single source of truth for the UI. One method: devices on the same Wi-Fi network. */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val container = (application as KirimlyApplication).container
@@ -77,57 +69,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val sharedItems: StateFlow<List<SharedItem>> = serverManager.sharedItems
     val pendingRequests: StateFlow<List<PendingTransferRequest>> = serverManager.pendingRequests
     val activeTransfers: StateFlow<List<TransferProgress>> = container.transferTracker.active
-    /** LAN peers first; Nearby peers only when the same device is not already reachable on the LAN. */
-    val peers: StateFlow<List<PeerDevice>> = combine(container.nsdManager.peers, container.nearbyManager.peers) { lan, nearby ->
-        val lanIds = lan.mapNotNull { it.deviceId }.toSet()
-        lan + nearby.filterNot { it.deviceId != null && it.deviceId in lanIds }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val nearbyActive: StateFlow<Boolean> = container.nearbyManager.active
-    val nearbyError: StateFlow<String?> = container.nearbyManager.lastError
-    val wifiJoinState: StateFlow<WifiJoiner.State> = container.wifiJoiner.state
+    val peers: StateFlow<List<PeerDevice>> = container.nsdManager.peers
     val isDiscovering: StateFlow<Boolean> = container.nsdManager.isDiscovering
-    val hotspotState: StateFlow<HotspotState> = container.hotspotManager.state
     val unreachablePeers: StateFlow<List<String>> = container.nsdManager.unreachablePeers
     val browsers: StateFlow<List<ConnectedBrowser>> = serverManager.browsers
-
-    /** Code to compare with the receiver's approval sheet while an encrypted send waits. */
-    private val _verificationCode = MutableStateFlow<String?>(null)
-    val verificationCode: StateFlow<String?> = _verificationCode.asStateFlow()
-
-    private val _crashLogCount = MutableStateFlow(0)
-    val crashLogCount: StateFlow<Int> = _crashLogCount.asStateFlow()
-
-    /** URL encoded in the Safari QR; optionally carries the PIN in the fragment (never sent to the server). */
-    val qrServerUrl: StateFlow<String?> = combine(serverState, pin, preferences) { state, currentPin, prefs ->
-        val running = state as? ServerState.Running
-        when {
-            running == null || !running.hasNetwork -> null
-            prefs.pinInQr && prefs.pinRequired -> running.url + "/#pin=" + currentPin
-            else -> running.url
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    /** Bonjour name Apple devices can open instead of the IP. */
-    val localHostUrl: StateFlow<String?> = serverState
-        .map { state -> (state as? ServerState.Running)?.let { "http://kirimly.local:${it.port}" } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val queueTotalBytes: StateFlow<Long> = sharedItems
         .map { items -> items.sumOf { it.sizeBytes.coerceAtLeast(0L) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
-    private val _qrMode = MutableStateFlow(QrMode.SERVER_URL)
-    val qrMode: StateFlow<QrMode> = _qrMode.asStateFlow()
-
-    val wifiPayload: StateFlow<String?> = hotspotState
-        .map { state ->
-            when (state) {
-                is HotspotState.Active -> QrCodeGenerator.buildWifiPayload(state.ssid, state.password)
-                is HotspotState.Manual -> QrCodeGenerator.buildWifiPayload(state.ssid, state.password)
-                else -> null
-            }
+    /** The one QR code: address plus PIN in the fragment, so scanning needs no typing. */
+    val qrUrl: StateFlow<String?> = combine(serverState, pin, preferences) { state, currentPin, prefs ->
+        val running = state as? ServerState.Running
+        when {
+            running == null || !running.hasNetwork -> null
+            prefs.pinRequired -> running.url + "/#pin=" + currentPin
+            else -> running.url
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _historyQuery = MutableStateFlow("")
     val historyQuery: StateFlow<String> = _historyQuery.asStateFlow()
@@ -162,6 +121,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _sendingPeerId = MutableStateFlow<String?>(null)
     val sendingPeerId: StateFlow<String?> = _sendingPeerId.asStateFlow()
 
+    private val _crashLogCount = MutableStateFlow(0)
+    val crashLogCount: StateFlow<Int> = _crashLogCount.asStateFlow()
+
     // Channels buffer one-shot events until the UI collects them (e.g. share intent on cold start).
     private val _messages = Channel<String>(capacity = Channel.BUFFERED)
     val messages: Flow<String> = _messages.receiveAsFlow()
@@ -173,48 +135,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             serverManager.events.collect { event ->
                 when (event) {
-                    is ServerEvent.FileReceived -> _messages.trySend("Diterima: ${event.fileName}")
-                    is ServerEvent.FileFailed -> _messages.trySend(tr(R.string.s_gagal_menerima, event.fileName, event.reason))
-                    is ServerEvent.TextReceived -> _messages.trySend(tr(R.string.s_teks_dari_disalin_ke_clipboard, event.from))
-                    is ServerEvent.FileDownloaded -> _messages.trySend("${event.by} mengunduh ${event.fileName}")
+                    is ServerEvent.FileReceived -> _messages.trySend(tr(R.string.u_msg_received, event.fileName))
+                    is ServerEvent.FileFailed -> _messages.trySend(tr(R.string.u_msg_receive_failed, event.fileName, event.reason))
+                    is ServerEvent.TextReceived -> _messages.trySend(tr(R.string.u_msg_text_received, event.from))
+                    is ServerEvent.FileDownloaded -> _messages.trySend(tr(R.string.u_msg_downloaded, event.by, event.fileName))
                     is ServerEvent.IncomingRequest -> Unit
-                    is ServerEvent.TrustedAutoAccepted ->
-                        _messages.trySend(tr(R.string.s_kiriman_dari_diterima_otomatis_perangkat, event.request.deviceName))
+                    is ServerEvent.TrustedAutoAccepted -> _messages.trySend(tr(R.string.u_msg_auto_accepted, event.request.deviceName))
                     is ServerEvent.BrowserOfferResult -> _messages.trySend(
-                        if (event.accepted) tr(R.string.s_mulai_mengunduh, event.browserName) else tr(R.string.s_menolak_kiriman, event.browserName)
+                        if (event.accepted) tr(R.string.u_msg_browser_downloading, event.browserName)
+                        else tr(R.string.u_msg_browser_declined, event.browserName)
                     )
-                    is ServerEvent.AddressChanged ->
-                        _messages.trySend(tr(R.string.s_alamat_berubah_ke_pindai_ulang, event.ip))
-                }
-            }
-        }
-        viewModelScope.launch {
-            hotspotState.collect { state ->
-                if (state is HotspotState.Active) {
-                    delay(1_500L)
-                    serverManager.refreshAddress()
-                    delay(3_000L)
-                    serverManager.refreshAddress()
+                    is ServerEvent.AddressChanged -> _messages.trySend(tr(R.string.u_msg_address_changed))
                 }
             }
         }
     }
 
-    // ------------------------------------------------------------------ server
+    // ------------------------------------------------------------------ server (always on while the app is open)
 
-    fun startServer() {
-        TransferForegroundService.start(getApplication())
+    fun ensureServerRunning() {
+        if (serverState.value is ServerState.Stopped || serverState.value is ServerState.Error) {
+            TransferForegroundService.start(getApplication())
+        }
     }
 
     fun stopServer() {
         TransferForegroundService.stop(getApplication())
-    }
-
-    fun toggleServer() {
-        when (serverState.value) {
-            is ServerState.Running, ServerState.Starting -> stopServer()
-            else -> startServer()
-        }
     }
 
     fun refreshAddress() {
@@ -223,179 +169,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshPin() {
         serverManager.refreshPin()
-        _messages.trySend(tr(R.string.s_pin_baru_dibuat))
-    }
-
-    fun setPinRequired(required: Boolean) {
-        viewModelScope.launch { container.preferences.setPinRequired(required) }
+        _messages.trySend(tr(R.string.u_msg_new_code))
     }
 
     fun respondToRequest(requestId: String, accept: Boolean, trust: Boolean = false) {
         serverManager.respondToRequest(requestId, accept, trust)
     }
 
-    /** Starts the server once per app session when the user enabled automatic start. */
-    private var autoStartAttempted = false
-
-    fun maybeAutoStartServer() {
-        if (autoStartAttempted) return
-        autoStartAttempted = true
-        val prefs = loadedPreferences.value ?: return
-        if (prefs.autoStartServer && serverState.value is ServerState.Stopped) startServer()
-    }
-
-    fun setAutoStartServer(enabled: Boolean) {
-        viewModelScope.launch { container.preferences.setAutoStartServer(enabled) }
-    }
-
-    fun setIdleStopMinutes(minutes: Int) {
-        viewModelScope.launch { container.preferences.setIdleStopMinutes(minutes) }
-    }
-
-    fun offerToBrowser(browser: ConnectedBrowser) {
-        if (sharedItems.value.isEmpty()) {
-            _messages.trySend(tr(R.string.s_antrean_kosong_tambahkan_file_atau))
-            return
-        }
-        if (serverManager.offerToBrowser(browser.id)) {
-            _messages.trySend(tr(R.string.s_tawaran_dikirim_ke_ketuk_unduh, browser.name))
-        } else {
-            _messages.trySend(tr(R.string.s_sudah_tidak_terhubung, browser.name))
-        }
-    }
-
-    fun refreshCrashLogs() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _crashLogCount.value = CrashLogger.logs(getApplication()).count { it.name.startsWith("crash-") }
-        }
-    }
-
-    /** Returns a shareable content Uri bundling all crash logs, or null when there are none. */
-    suspend fun crashReportUri(): Uri? = withContext(Dispatchers.IO) {
-        val app = getApplication<Application>()
-        CrashLogger.bundle(app)?.let { FileProvider.getUriForFile(app, app.packageName + ".fileprovider", it) }
-    }
-
-    fun clearCrashLogs() {
-        viewModelScope.launch(Dispatchers.IO) {
-            CrashLogger.clear(getApplication())
-            _crashLogCount.value = 0
-        }
-    }
-
-    fun setPinInQr(enabled: Boolean) {
-        viewModelScope.launch { container.preferences.setPinInQr(enabled) }
-    }
-
-    fun setConvertHeic(enabled: Boolean) {
-        viewModelScope.launch { container.preferences.setConvertHeic(enabled) }
-    }
-
-    fun removeTrustedDevice(id: String) {
-        viewModelScope.launch { container.preferences.removeTrustedDevice(id) }
-        _messages.trySend(tr(R.string.s_perangkat_dihapus_dari_daftar_tepercaya))
-    }
-
-    fun setQrMode(mode: QrMode) {
-        _qrMode.value = mode
-    }
-
-    // ------------------------------------------------------------------ hotspot
-
-    fun hotspotPermission(): String = container.hotspotManager.requiredPermission()
-
-    fun startHotspot() {
-        container.hotspotManager.start()
-    }
-
-    fun stopHotspot() {
-        container.hotspotManager.stop()
-        serverManager.refreshAddress()
-    }
-
-    fun setManualHotspot(ssid: String, password: String) {
-        if (ssid.isBlank()) {
-            _messages.trySend(tr(R.string.s_ssid_tidak_boleh_kosong))
-            return
-        }
-        if (password.isNotEmpty() && password.length < 8) {
-            _messages.trySend(tr(R.string.s_kata_sandi_wpa_minimal_8))
-            return
-        }
-        container.hotspotManager.setManualCredentials(ssid, password)
-        serverManager.refreshAddress()
-    }
-
-    fun resetHotspot() {
-        container.hotspotManager.reset()
-    }
-
     // ------------------------------------------------------------------ discovery
 
-    /** Runtime permissions Nearby Connections needs on this Android version. */
-    fun nearbyPermissions(): List<String> = buildList {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            add(Manifest.permission.BLUETOOTH_SCAN)
-            add(Manifest.permission.BLUETOOTH_ADVERTISE)
-            add(Manifest.permission.BLUETOOTH_CONNECT)
-        } else {
-            add(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.NEARBY_WIFI_DEVICES)
-        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.S..Build.VERSION_CODES.S_V2) add(Manifest.permission.ACCESS_FINE_LOCATION)
-    }
+    fun startDiscovery() = container.nsdManager.startDiscovery()
 
-    fun hasNearbyPermissions(): Boolean = nearbyPermissions().all {
-        ContextCompat.checkSelfPermission(getApplication(), it) == PackageManager.PERMISSION_GRANTED
-    }
+    fun stopDiscovery() = container.nsdManager.stopDiscovery()
 
-    fun startNearby() {
-        if (hasNearbyPermissions()) container.nearbyManager.start()
-    }
-
-    fun joinIphoneHotspot(ssid: String, password: String) {
-        if (ssid.isBlank()) {
-            _messages.trySend(tr(R.string.s_isi_nama_hotspot_iphone))
-            return
-        }
-        container.wifiJoiner.join(ssid, password) {
-            viewModelScope.launch {
-                delay(1_500L)
-                serverManager.refreshAddress()
-                if (serverState.value is ServerState.Stopped) startServer()
-                _qrMode.value = QrMode.SERVER_URL
-            }
-        }
-    }
-
-    fun leaveIphoneHotspot() {
-        container.wifiJoiner.disconnect()
-        serverManager.refreshAddress()
-    }
-
-    /** True when this phone has a usable LAN / hotspot address right now. */
-    fun hasLanAddress(): Boolean = NetworkUtils.getLocalIpv4Address() != null
-
-    /** Receive tab opened without Wi-Fi: start the local hotspot and show the two-scan flow. */
-    fun autoHotspotIfOffline() {
-        if (hasLanAddress()) return
-        if (hotspotState.value !is HotspotState.Idle) return
-        if (!container.hotspotManager.hasPermission()) return
-        _qrMode.value = QrMode.WIFI_HOTSPOT
-        container.hotspotManager.start()
-    }
-
-    fun startDiscovery() {
-        container.nsdManager.startDiscovery()
-    }
-
-    fun stopDiscovery() {
-        container.nsdManager.stopDiscovery()
-    }
-
-    fun rescan() {
-        container.nsdManager.restartDiscovery()
-    }
+    fun rescan() = container.nsdManager.restartDiscovery()
 
     // ------------------------------------------------------------------ queue
 
@@ -407,7 +194,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (uris.isEmpty()) return
         viewModelScope.launch {
             val app = getApplication<Application>()
-            var copied = 0
             val items = withContext(Dispatchers.IO) {
                 uris.mapNotNull { uri ->
                     val persisted = !fromShareSheet && try {
@@ -417,31 +203,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         false
                     }
                     val meta = NetworkUtils.querySharedFile(app, uri) ?: return@mapNotNull null
-                    if (persisted || SharedFileCache.isCached(app, uri)) {
-                        meta
-                    } else {
-                        SharedFileCache.copyIntoCache(app, meta)?.also { copied++ } ?: meta
-                    }
+                    if (persisted || SharedFileCache.isCached(app, uri)) meta
+                    else SharedFileCache.copyIntoCache(app, meta) ?: meta
                 }
             }
             if (items.isEmpty()) {
-                _messages.trySend(tr(R.string.s_file_tidak_dapat_dibaca))
+                _messages.trySend(tr(R.string.u_msg_unreadable))
             } else {
                 serverManager.addSharedItems(items)
-                val note = if (copied > 0) tr(R.string.s_disalin_agar_tetap_bisa_diakses, copied) else ""
-                _messages.trySend(tr(R.string.s_file_ditambahkan_ke_antrean, items.size, note))
             }
         }
     }
 
     fun addText(text: String): Boolean {
         val clean = text.trim()
-        if (clean.isEmpty()) {
-            _messages.trySend(tr(R.string.s_teks_masih_kosong))
-            return false
-        }
+        if (clean.isEmpty()) return false
         serverManager.addSharedItems(listOf(SharedText(UUID.randomUUID().toString(), clean)))
-        _messages.trySend(tr(R.string.s_teks_ditambahkan_ke_antrean))
         return true
     }
 
@@ -452,13 +229,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return clip.getItemAt(0).coerceToText(getApplication()).toString().takeIf { it.isNotBlank() }
     }
 
-    fun removeItem(id: String) {
-        serverManager.removeSharedItem(id)
-    }
+    fun removeItem(id: String) = serverManager.removeSharedItem(id)
 
-    fun clearQueue() {
-        serverManager.clearSharedItems()
-    }
+    fun clearQueue() = serverManager.clearSharedItems()
 
     /** Ingests ACTION_SEND / ACTION_SEND_MULTIPLE share-sheet intents. */
     fun handleShareIntent(intent: Intent?) {
@@ -483,51 +256,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _navigation.trySend(ROUTE_SEND)
             }
         }
-        val tab = intent.getStringExtra(EXTRA_OPEN_TAB)
-        if (tab != null) _navigation.trySend(tab)
+        intent.getStringExtra(EXTRA_OPEN_TAB)?.let { _navigation.trySend(it) }
     }
 
-    // ------------------------------------------------------------------ peer sending
+    // ------------------------------------------------------------------ sending
 
     fun sendToPeer(peer: PeerDevice, pin: String?) {
         val items = sharedItems.value
         if (items.isEmpty()) {
-            _messages.trySend(tr(R.string.s_antrean_kosong_tambahkan_file_atau))
+            _messages.trySend(tr(R.string.u_msg_queue_empty))
             return
         }
-        if (_sendingPeerId.value != null) {
-            _messages.trySend(tr(R.string.s_masih_mengirim_ke_perangkat_lain))
-            return
-        }
+        if (_sendingPeerId.value != null) return
         _sendingPeerId.value = peer.id
-        _messages.trySend(tr(R.string.s_menunggu_persetujuan_dari, peer.name))
         viewModelScope.launch {
-            val result = if (peer.channel == PeerDevice.CHANNEL_NEARBY) {
-                container.nearbyManager.send(peer, items, preferences.value.deviceNickname) { code ->
-                    _verificationCode.value = code
-                }
-            } else {
-                container.peerClient.sendItems(peer, pin, items, preferences.value.deviceNickname) { code ->
-                    _verificationCode.value = code
-                }
-            }
-            _verificationCode.value = null
+            val result = container.peerClient.sendItems(peer, pin, items, preferences.value.deviceNickname)
             _sendingPeerId.value = null
             val message = when (result) {
                 is PeerSendResult.Success -> {
-                    val parts = buildList {
-                        if (result.fileCount > 0) add("${result.fileCount} file")
-                        if (result.textCount > 0) add("${result.textCount} teks")
-                    }.joinToString(" & ")
-                    tr(R.string.s_terkirim_ke, peer.name, parts) + if (result.encrypted) tr(R.string.s_terenkripsi) else ""
+                    clearQueue()
+                    tr(R.string.u_msg_sent, peer.name)
                 }
-                PeerSendResult.PinRejected -> tr(R.string.s_pin_salah_untuk, peer.name)
-                PeerSendResult.Declined -> tr(R.string.s_menolak_kiriman_2, peer.name)
-                PeerSendResult.Timeout -> tr(R.string.s_tidak_merespons, peer.name)
-                is PeerSendResult.Failed -> "Gagal: ${result.message}"
+                PeerSendResult.PinRejected -> tr(R.string.u_msg_wrong_code, peer.name)
+                PeerSendResult.Declined -> tr(R.string.u_msg_declined, peer.name)
+                PeerSendResult.Timeout -> tr(R.string.u_msg_no_answer, peer.name)
+                is PeerSendResult.Failed -> tr(R.string.u_msg_send_failed, result.message)
             }
             _messages.trySend(message)
         }
+    }
+
+    fun offerToBrowser(browser: ConnectedBrowser) {
+        if (sharedItems.value.isEmpty()) {
+            _messages.trySend(tr(R.string.u_msg_queue_empty))
+            return
+        }
+        _messages.trySend(
+            if (serverManager.offerToBrowser(browser.id)) tr(R.string.u_msg_offer_sent, browser.name)
+            else tr(R.string.u_msg_browser_gone, browser.name)
+        )
     }
 
     // ------------------------------------------------------------------ history
@@ -546,21 +313,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearHistory() {
         viewModelScope.launch(Dispatchers.IO) { dao.clearAll() }
-        _messages.trySend(tr(R.string.s_riwayat_dihapus))
     }
 
     fun copyToClipboard(text: String) {
         val clipboard = getApplication<Application>().getSystemService(ClipboardManager::class.java) ?: return
         clipboard.setPrimaryClip(ClipData.newPlainText("Kirimly", text))
-        // Android 13+ shows its own clipboard confirmation.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) _messages.trySend(tr(R.string.s_disalin_ke_clipboard))
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) _messages.trySend(tr(R.string.u_msg_copied))
     }
 
     fun showMessage(message: String) {
         _messages.trySend(message)
     }
 
-    // ------------------------------------------------------------------ preferences
+    // ------------------------------------------------------------------ settings
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { container.preferences.setThemeMode(mode) }
@@ -572,7 +337,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setNickname(nickname: String) {
         viewModelScope.launch { container.preferences.setDeviceNickname(nickname) }
-        _messages.trySend(tr(R.string.s_nama_perangkat_disimpan))
+    }
+
+    fun removeTrustedDevice(id: String) {
+        viewModelScope.launch { container.preferences.removeTrustedDevice(id) }
     }
 
     fun completeOnboarding() {
@@ -583,18 +351,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { container.preferences.setOnboardingCompleted(false) }
     }
 
-    fun dismissTransfer(id: String) {
-        container.transferTracker.dismiss(id)
+    fun refreshCrashLogs() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _crashLogCount.value = CrashLogger.logs(getApplication()).count { it.name.startsWith("crash-") }
+        }
     }
 
-    fun clearFinishedTransfers() {
-        container.transferTracker.clearFinished()
+    /** Returns a shareable content Uri bundling all crash logs, or null when there are none. */
+    suspend fun crashReportUri(): Uri? = withContext(Dispatchers.IO) {
+        val app = getApplication<Application>()
+        CrashLogger.bundle(app)?.let { FileProvider.getUriForFile(app, app.packageName + ".fileprovider", it) }
     }
 
-    override fun onCleared() {
-        container.nearbyManager.stop()
-        super.onCleared()
-    }
+    fun dismissTransfer(id: String) = container.transferTracker.dismiss(id)
+
+    fun clearFinishedTransfers() = container.transferTracker.clearFinished()
 
     companion object {
         const val ROUTE_SEND = "send"

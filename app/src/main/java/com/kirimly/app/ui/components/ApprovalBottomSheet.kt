@@ -53,7 +53,7 @@ fun ApprovalBottomSheet(
     onAccept: (trust: Boolean) -> Unit,
     onDecline: () -> Unit
 ) {
-    var trust by remember(request.id) { mutableStateOf(false) }
+    var trust by remember(request.id) { mutableStateOf(true) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var now by remember(request.id) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(request.id) {
@@ -156,24 +156,6 @@ fun ApprovalBottomSheet(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                        )
-                    }
-                }
-            }
-
-            request.verificationCode?.let { code ->
-                Surface(
-                    shape = RectangleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(tr(R.string.s_kode_verifikasi), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(code, style = MonoDigits.copy(fontSize = 28.sp))
-                        Text(
-                            tr(R.string.s_pastikan_sama_dengan_kode_di),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

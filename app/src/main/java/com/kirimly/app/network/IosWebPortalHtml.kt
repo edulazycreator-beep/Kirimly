@@ -446,6 +446,11 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     return out;
   };
   Sha256.hexOf = function (bytes) { return new Sha256().update(bytes).hex(); };
+  Sha256.prototype.clone = function () {
+    var c = new Sha256();
+    c.h.set(this.h); c.buf.set(this.buf); c.bufLen = this.bufLen; c.total = this.total;
+    return c;
+  };
 
 
   var CONCURRENCY = 3;
@@ -1017,7 +1022,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     var hashValid = true;
     var retries = 0;
     var uploadId = null;
-    var chunkSize = 4 * 1024 * 1024;
+    var chunkSize = 8 * 1024 * 1024;
 
     function retryOr(err) {
       retries++;
@@ -1042,14 +1047,16 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       var end = Math.min(offset + chunkSize, file.size);
       return readBlob(file.slice(offset, end)).then(function (buf) {
         var bytes = new Uint8Array(buf);
-        var sum = Sha256.hexOf(bytes);
         var url = '/api/upload/chunk?id=' + encodeURIComponent(uploadId) + '&offset=' + offset;
-        return xhrSend('POST', url, { 'Content-Type': 'application/octet-stream', 'X-Chunk-Sha256': sum }, buf, function (loaded) {
+        var sending = xhrSend('POST', url, { 'Content-Type': 'application/octet-stream' }, buf, function (loaded) {
           onProgress(offset + loaded);
-        }).then(function (res) {
+        });
+        /* Hash this chunk while the browser is still uploading it; commit only if the server accepts. */
+        var tentative = (hashValid && hashed === offset) ? hasher.clone().update(bytes) : null;
+        return sending.then(function (res) {
           if (res.status >= 200 && res.status < 300) {
             retries = 0;
-            if (hashValid && hashed === offset) { hasher.update(bytes); hashed = end; }
+            if (tentative && hashed === offset) { hasher = tentative; hashed = end; }
             onProgress(res.data.offset);
             return sendFrom(res.data.offset);
           }

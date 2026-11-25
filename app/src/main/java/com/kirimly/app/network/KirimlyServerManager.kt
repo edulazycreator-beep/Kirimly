@@ -916,7 +916,7 @@ class KirimlyServerManager(
                                         }
                                         is SharedFile -> {
                                             appContext.contentResolver.openInputStream(item.uri)?.use { input ->
-                                                val buffer = ByteArray(NetworkUtils.BUFFER_SIZE * 8)
+                                                val buffer = ByteArray(STREAM_BUFFER)
                                                 while (true) {
                                                     val read = input.read(buffer)
                                                     if (read == -1) break
@@ -1443,7 +1443,7 @@ class KirimlyServerManager(
                     val input = context.contentResolver.openInputStream(uri)
                         ?: throw IOException("File sumber tidak dapat dibuka")
                     input.use { stream ->
-                        val buffer = ByteArray(NetworkUtils.BUFFER_SIZE)
+                        val buffer = ByteArray(STREAM_BUFFER)
                         while (true) {
                             val read = stream.read(buffer)
                             if (read == -1) break
@@ -1469,11 +1469,13 @@ class KirimlyServerManager(
         const val TOKEN_HEADER = "X-Kirimly-Token"
         const val DEVICE_HEADER = "X-Kirimly-Device"
         const val CHUNK_SHA_HEADER = "X-Chunk-Sha256"
-        const val CHUNK_SIZE = 4 * 1024 * 1024
+        const val CHUNK_SIZE = 8 * 1024 * 1024
         private const val MAX_CHUNK_BYTES = 17L * 1024L * 1024L
         private const val UPLOAD_IDLE_TIMEOUT_MS = 30L * 60L * 1000L
         private const val JANITOR_INTERVAL_MS = 60_000L
         private const val THUMBNAIL_PX = 240
+        /** 512 KB reads keep Wi-Fi saturated when serving downloads; 8 KB reads cost many suspends. */
+        private const val STREAM_BUFFER = 512 * 1024
         val FEATURES = listOf("chunked-v2", "e2e-ecdh-aesgcm", "zip", "folders", "trusted-devices")
         const val NO_NETWORK_IP = "0.0.0.0"
         const val APPROVAL_TIMEOUT_MS = 55_000L

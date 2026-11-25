@@ -84,28 +84,22 @@ fun OnboardingScreen(onFinish: () -> Unit) {
     val pages = remember {
         listOf(
             OnboardingPage(
-                eyebrow = tr(R.string.s_selamat_datang),
-                title = tr(R.string.s_kirim_file_antar_android_dan),
-                body = tr(R.string.s_kirimly_bekerja_di_jaringan_lokal),
+                eyebrow = tr(R.string.u_ob1_eyebrow),
+                title = tr(R.string.u_ob1_title),
+                body = tr(R.string.u_ob1_body),
                 illustration = { AnimatedKirimlyMark(modifier = Modifier.size(220.dp)) }
             ),
             OnboardingPage(
-                eyebrow = "iPhone & iPad",
-                title = tr(R.string.s_iphone_cukup_pindai_qr_lalu),
-                body = tr(R.string.s_nyalakan_server_di_tab_terima),
-                illustration = { QrScanIllustration() }
-            ),
-            OnboardingPage(
-                eyebrow = tr(R.string.s_keamanan),
-                title = tr(R.string.s_setiap_kiriman_butuh_pin_dan),
-                body = tr(R.string.s_perangkat_lain_memasukkan_pin_4),
-                illustration = { PinIllustration() }
-            ),
-            OnboardingPage(
-                eyebrow = tr(R.string.s_android_ke_android),
-                title = tr(R.string.s_perangkat_kirimly_terdekat_muncul_di),
-                body = tr(R.string.s_tambahkan_file_ke_antrean_di),
+                eyebrow = tr(R.string.u_ob2_eyebrow),
+                title = tr(R.string.u_ob2_title),
+                body = tr(R.string.u_ob2_body),
                 illustration = { RadarIllustration() }
+            ),
+            OnboardingPage(
+                eyebrow = tr(R.string.u_ob3_eyebrow),
+                title = tr(R.string.u_ob3_title),
+                body = tr(R.string.u_ob3_body),
+                illustration = { QrScanIllustration() }
             )
         )
     }

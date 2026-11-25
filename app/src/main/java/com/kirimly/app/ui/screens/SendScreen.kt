@@ -2,22 +2,10 @@
 
 package com.kirimly.app.ui.screens
 
-import com.kirimly.app.R
-import com.kirimly.app.util.tr
-import androidx.compose.material.icons.rounded.Language
-import com.kirimly.app.data.model.ConnectedBrowser
-import androidx.compose.ui.unit.sp
-import com.kirimly.app.ui.theme.MonoDigits
-import com.kirimly.app.ui.components.FileThumbnail
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,33 +17,30 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.PlaylistAdd
-import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.PhoneIphone
 import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -65,27 +50,29 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kirimly.app.R
+import com.kirimly.app.data.model.ConnectedBrowser
 import com.kirimly.app.data.model.PeerDevice
-import com.kirimly.app.data.model.ServerState
 import com.kirimly.app.data.model.SharedFile
 import com.kirimly.app.data.model.SharedItem
 import com.kirimly.app.data.model.SharedText
 import com.kirimly.app.network.NetworkUtils
 import com.kirimly.app.ui.MainViewModel
-import com.kirimly.app.ui.components.RadarPulseCanvas
-import com.kirimly.app.ui.components.fileIconFor
+import com.kirimly.app.ui.components.FileThumbnail
+import com.kirimly.app.util.tr
 
-@Suppress("DEPRECATION")
+/** Send = two plain steps: 1) what to send, 2) who gets it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SendScreen(
@@ -94,56 +81,34 @@ fun SendScreen(
     onOpenReceive: () -> Unit
 ) {
     val peers by viewModel.peers.collectAsStateWithLifecycle()
-    val isDiscovering by viewModel.isDiscovering.collectAsStateWithLifecycle()
+    val browsers by viewModel.browsers.collectAsStateWithLifecycle()
     val queue by viewModel.sharedItems.collectAsStateWithLifecycle()
     val totalBytes by viewModel.queueTotalBytes.collectAsStateWithLifecycle()
-    val serverState by viewModel.serverState.collectAsStateWithLifecycle()
     val sendingPeerId by viewModel.sendingPeerId.collectAsStateWithLifecycle()
-    val unreachablePeers by viewModel.unreachablePeers.collectAsStateWithLifecycle()
+    val unreachable by viewModel.unreachablePeers.collectAsStateWithLifecycle()
 
-    var textDraft by rememberSaveable { mutableStateOf("") }
     var pinTarget by remember { mutableStateOf<PeerDevice?>(null) }
-    var confirmTarget by remember { mutableStateOf<PeerDevice?>(null) }
+    var showTextDialog by remember { mutableStateOf(false) }
 
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         viewModel.addUris(uris)
     }
 
-    val browsers by viewModel.browsers.collectAsStateWithLifecycle()
-    val verificationCode by viewModel.verificationCode.collectAsStateWithLifecycle()
-    val nearbyError by viewModel.nearbyError.collectAsStateWithLifecycle()
-
-    val nearbyPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { viewModel.startNearby() }
-
     DisposableEffect(Unit) {
         viewModel.startDiscovery()
-        if (viewModel.hasNearbyPermissions()) viewModel.startNearby()
-        else nearbyPermissionLauncher.launch(viewModel.nearbyPermissions().toTypedArray())
         onDispose { viewModel.stopDiscovery() }
     }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(tr(R.string.s_kirim), style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            tr(R.string.s_bagikan_ke_perangkat_terdekat),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
+                title = { Text(tr(R.string.u_send_title), style = MaterialTheme.typography.headlineSmall) },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Palette, contentDescription = tr(R.string.s_tema_pengaturan))
+                        Icon(Icons.Rounded.Palette, contentDescription = tr(R.string.u_settings))
                     }
                 },
                 scrollBehavior = scrollBehavior
@@ -154,153 +119,132 @@ fun SendScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item(key = "radar") {
-                RadarCard(
-                    peers = peers,
-                    isDiscovering = isDiscovering,
-                    serverState = serverState,
-                    sendingPeerId = sendingPeerId,
-                    onPeerClick = { peer ->
-                        if (queue.isEmpty()) {
-                            viewModel.showMessage(tr(R.string.s_antrean_kosong_tambahkan_file_atau))
-                        } else if (peer.pinRequired && peer.channel != PeerDevice.CHANNEL_NEARBY) {
-                            pinTarget = peer
-                        } else {
-                            confirmTarget = peer
-                        }
-                    },
-                    onRescan = viewModel::rescan,
-                    onToggleServer = viewModel::toggleServer
-                )
-            }
-
-            if (unreachablePeers.isNotEmpty()) {
-                item(key = "isolation") {
-                    IsolationBanner(names = unreachablePeers, onUseHotspot = onOpenReceive)
-                }
-            }
-
-            if (browsers.isNotEmpty()) {
-                item(key = "browsers") {
-                    BrowsersCard(browsers = browsers, hasQueue = queue.isNotEmpty(), onOffer = viewModel::offerToBrowser)
-                }
-            }
-
-            if (nearbyError != null && peers.isEmpty()) {
-                item(key = "nearbyError") {
-                    Text(
-                        text = nearbyError.orEmpty() + tr(R.string.s_perangkat_di_wi_fi_yang),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            item(key = "actions") {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = { pickFiles.launch(arrayOf("*/*")) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(54.dp)
-                    ) {
-                        Icon(Icons.Rounded.AttachFile, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text(tr(R.string.s_pilih_file))
-                    }
-                    FilledTonalButton(
-                        onClick = {
-                            val clip = viewModel.readClipboardText()
-                            if (clip == null) viewModel.showMessage(tr(R.string.s_clipboard_kosong)) else viewModel.addText(clip)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(54.dp)
-                    ) {
-                        Icon(Icons.Rounded.ContentPaste, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Clipboard")
-                    }
-                }
-            }
-
-            item(key = "composer") {
-                TextComposerCard(
-                    text = textDraft,
-                    onTextChange = { textDraft = it },
-                    onPaste = {
-                        val clip = viewModel.readClipboardText()
-                        if (clip == null) viewModel.showMessage(tr(R.string.s_clipboard_kosong)) else textDraft = clip
-                    },
-                    onAdd = { if (viewModel.addText(textDraft)) textDraft = "" }
-                )
-            }
-
-            item(key = "queueHeader") {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                ) {
-                    Text(tr(R.string.s_antrean), style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.size(8.dp))
-                    if (queue.isNotEmpty()) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer
+            // ---------------- Step 1: what
+            item(key = "step1") {
+                StepCard(number = 1, title = tr(R.string.u_step_what)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = { pickFiles.launch(arrayOf("*/*")) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp)
                         ) {
+                            Icon(Icons.Rounded.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text(tr(R.string.u_pick_files))
+                        }
+                        OutlinedButton(
+                            onClick = { showTextDialog = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp)
+                        ) {
+                            Icon(Icons.Rounded.TextFields, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text(tr(R.string.u_add_text))
+                        }
+                    }
+                    if (queue.isEmpty()) {
+                        Text(
+                            tr(R.string.u_queue_empty_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Column {
+                            queue.forEach { item ->
+                                QueueRow(item = item, onRemove = { viewModel.removeItem(item.id) })
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = tr(R.string.s_item, queue.size, NetworkUtils.formatFileSize(totalBytes)),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                tr(R.string.u_queue_summary, queue.size, NetworkUtils.formatFileSize(totalBytes)),
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = viewModel::clearQueue) { Text(tr(R.string.u_clear)) }
+                        }
+                    }
+                }
+            }
+
+            // ---------------- Step 2: who
+            item(key = "step2") {
+                StepCard(number = 2, title = tr(R.string.u_step_who)) {
+                    if (unreachable.isNotEmpty()) {
+                        Notice(tr(R.string.u_isolation, unreachable.joinToString(", ")))
+                    }
+                    peers.forEach { peer ->
+                        DestinationRow(
+                            icon = Icons.Rounded.PhoneAndroid,
+                            title = peer.name,
+                            subtitle = tr(R.string.u_dest_android),
+                            busy = sendingPeerId == peer.id,
+                            enabled = queue.isNotEmpty() && sendingPeerId == null,
+                            onSend = { if (peer.pinRequired) pinTarget = peer else viewModel.sendToPeer(peer, null) }
+                        )
+                    }
+                    browsers.forEach { browser ->
+                        DestinationRow(
+                            icon = Icons.Rounded.Language,
+                            title = browser.name,
+                            subtitle = tr(R.string.u_dest_safari),
+                            busy = false,
+                            enabled = queue.isNotEmpty(),
+                            onSend = { viewModel.offerToBrowser(browser) }
+                        )
+                    }
+                    if (peers.isEmpty() && browsers.isEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.size(12.dp))
+                            Text(tr(R.string.u_searching), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Text(
+                            tr(R.string.u_searching_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.PhoneIphone, contentDescription = null, modifier = Modifier.size(22.dp))
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp)
+                        ) {
+                            Text(tr(R.string.u_dest_iphone_title), style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                tr(R.string.u_dest_iphone_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        TextButton(onClick = onOpenReceive) { Text(tr(R.string.u_show_qr)) }
                     }
-                    Spacer(Modifier.weight(1f))
-                    if (queue.isNotEmpty()) {
-                        TextButton(onClick = viewModel::clearQueue) {
-                            Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(6.dp))
-                            Text(tr(R.string.s_kosongkan))
-                        }
-                    }
-                }
-            }
-
-            if (queue.isEmpty()) {
-                item(key = "empty") { EmptyQueue() }
-            } else {
-                items(queue, key = { it.id }) { item ->
-                    QueueItemRow(item = item, onRemove = { viewModel.removeItem(item.id) })
                 }
             }
         }
     }
 
-    verificationCode?.let { code ->
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text(tr(R.string.s_cocokkan_kode_ini)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(code, style = MonoDigits.copy(fontSize = 32.sp))
-                    Text(
-                        tr(R.string.s_kode_yang_sama_harus_tampil),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            confirmButton = {}
+    if (showTextDialog) {
+        TextDialog(
+            initial = "",
+            onPaste = { viewModel.readClipboardText() },
+            onDismiss = { showTextDialog = false },
+            onAdd = { text ->
+                if (viewModel.addText(text)) showTextDialog = false
+            }
         )
     }
 
     pinTarget?.let { peer ->
-        PinEntryDialog(
+        PinDialog(
             peer = peer,
             onDismiss = { pinTarget = null },
             onConfirm = { pin ->
@@ -309,307 +253,153 @@ fun SendScreen(
             }
         )
     }
-
-    confirmTarget?.let { peer ->
-        AlertDialog(
-            onDismissRequest = { confirmTarget = null },
-            title = { Text(tr(R.string.s_kirim_ke, peer.name)) },
-            text = { Text(tr(R.string.s_item_akan_dikirim_penerima_perlu, queue.size, NetworkUtils.formatFileSize(totalBytes))) },
-            confirmButton = {
-                Button(onClick = {
-                    confirmTarget = null
-                    viewModel.sendToPeer(peer, null)
-                }) { Text(tr(R.string.s_kirim)) }
-            },
-            dismissButton = { TextButton(onClick = { confirmTarget = null }) { Text(tr(R.string.s_batal)) } }
-        )
-    }
 }
 
 @Composable
-private fun RadarCard(
-    peers: List<PeerDevice>,
-    isDiscovering: Boolean,
-    serverState: ServerState,
-    sendingPeerId: String?,
-    onPeerClick: (PeerDevice) -> Unit,
-    onRescan: () -> Unit,
-    onToggleServer: () -> Unit
-) {
+internal fun StepCard(number: Int?, title: String, content: @Composable () -> Unit) {
     Card(
         shape = RectangleShape,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(tr(R.string.s_radar_perangkat), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = when {
-                            sendingPeerId != null -> tr(R.string.s_mengirim_tunggu_persetujuan_penerima)
-                            peers.isNotEmpty() -> tr(R.string.s_perangkat_kirimly_ditemukan_ketuk_untuk, peers.size)
-                            isDiscovering -> tr(R.string.s_mencari_perangkat_kirimly_di_jaringan)
-                            else -> tr(R.string.s_pemindaian_berhenti)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (sendingPeerId != null) {
-                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
-                } else {
-                    IconButton(onClick = onRescan) { Icon(Icons.Rounded.Refresh, contentDescription = tr(R.string.s_pindai_ulang)) }
-                }
-            }
-
-            RadarPulseCanvas(isScanning = isDiscovering, peers = peers, onPeerClick = onPeerClick)
-
-            Surface(
-                shape = RectangleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(tr(R.string.s_berbagi_cepat_ke_safari), style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                text = when (serverState) {
-                                    is ServerState.Running -> tr(R.string.s_iphone_bisa_mengunduh_antrean_di, serverState.url)
-                                    ServerState.Starting -> tr(R.string.s_menyalakan_server)
-                                    is ServerState.Error -> serverState.message
-                                    ServerState.Stopped -> tr(R.string.s_nyalakan_agar_ios_dapat_mengambil)
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Spacer(Modifier.size(12.dp))
-                        Switch(
-                            checked = serverState is ServerState.Running || serverState == ServerState.Starting,
-                            onCheckedChange = { onToggleServer() }
+                if (number != null) {
+                    Surface(
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Text(
+                            number.toString(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 3.dp)
                         )
                     }
+                    Spacer(Modifier.size(12.dp))
                 }
+                Text(title, style = MaterialTheme.typography.titleMedium)
             }
+            content()
         }
     }
 }
 
 @Composable
-private fun TextComposerCard(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onPaste: () -> Unit,
-    onAdd: () -> Unit
-) {
-    Card(
-        shape = RectangleShape,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-    ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.size(10.dp))
-                Text(tr(R.string.s_kirim_teks_tautan), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                AssistChip(
-                    onClick = onPaste,
-                    label = { Text(tr(R.string.s_tempel)) },
-                    leadingIcon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                )
-            }
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
-                placeholder = { Text(tr(R.string.s_ketik_pesan_catatan_atau_url)) },
-                minLines = 2,
-                maxLines = 6,
-                shape = RectangleShape,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                modifier = Modifier.fillMaxWidth()
-            )
-            AnimatedVisibility(visible = text.isNotBlank()) {
-                Button(
-                    onClick = onAdd,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Rounded.PlaylistAdd, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text(tr(R.string.s_tambah_ke_antrean))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun QueueItemRow(item: SharedItem, onRemove: () -> Unit) {
-    Card(
-        shape = RectangleShape,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FileThumbnail(
-                uri = (item as? SharedFile)?.uri,
-                mimeType = item.mimeType,
-                fileName = item.displayName,
-                modifier = Modifier.size(42.dp)
-            )
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 14.dp)
-            ) {
-                Text(
-                    text = item.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = if (item is SharedText) 2 else 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = when (item) {
-                        is SharedFile -> NetworkUtils.formatFileSize(item.sizeBytes) + " • " + item.mimeType
-                        is SharedText -> tr(R.string.s_teks_karakter, item.text.length)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Rounded.Close, contentDescription = tr(R.string.s_hapus_dari_antrean))
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyQueue() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 28.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.Inbox,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.size(48.dp)
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(tr(R.string.s_antrean_masih_kosong), style = MaterialTheme.typography.titleSmall)
+internal fun Notice(text: String) {
+    Surface(shape = RectangleShape, color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
         Text(
-            tr(R.string.s_pilih_file_tempel_clipboard_atau),
+            text,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 24.dp)
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(12.dp)
         )
     }
 }
 
 @Composable
-private fun PinEntryDialog(peer: PeerDevice, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var pin by remember { mutableStateOf("") }
+private fun QueueRow(item: SharedItem, onRemove: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+        FileThumbnail(
+            uri = (item as? SharedFile)?.uri,
+            mimeType = item.mimeType,
+            fileName = item.displayName,
+            modifier = Modifier.size(40.dp)
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp)
+        ) {
+            Text(item.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                when (item) {
+                    is SharedFile -> NetworkUtils.formatFileSize(item.sizeBytes)
+                    is SharedText -> tr(R.string.u_text_item)
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        IconButton(onClick = onRemove) { Icon(Icons.Rounded.Close, contentDescription = tr(R.string.u_remove)) }
+    }
+}
+
+@Composable
+private fun DestinationRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    busy: Boolean,
+    enabled: Boolean,
+    onSend: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+        } else {
+            FilledTonalButton(onClick = onSend, enabled = enabled) { Text(tr(R.string.u_send)) }
+        }
+    }
+}
+
+@Composable
+private fun TextDialog(initial: String, onPaste: () -> String?, onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(tr(R.string.s_pin, peer.name)) },
+        title = { Text(tr(R.string.u_add_text)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(tr(R.string.s_masukkan_pin_4_digit_yang))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value = pin,
-                    onValueChange = { value -> pin = value.filter { it.isDigit() }.take(4) },
-                    singleLine = true,
-                    placeholder = { Text("• • • •") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    textStyle = MaterialTheme.typography.headlineSmall.copy(textAlign = TextAlign.Center),
-                    shape = RectangleShape,
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text(tr(R.string.u_text_label)) },
+                    minLines = 3,
+                    maxLines = 8,
                     modifier = Modifier.fillMaxWidth()
                 )
+                TextButton(onClick = { onPaste()?.let { text = it } }) { Text(tr(R.string.u_paste_clipboard)) }
             }
         },
-        confirmButton = {
-            Button(onClick = { onConfirm(pin) }, enabled = pin.length == 4) { Text(tr(R.string.s_kirim)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr(R.string.s_batal)) } }
+        confirmButton = { Button(onClick = { onAdd(text) }, enabled = text.isNotBlank()) { Text(tr(R.string.u_add)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr(R.string.u_cancel)) } }
     )
 }
 
 @Composable
-private fun IsolationBanner(names: List<String>, onUseHotspot: () -> Unit) {
-    Surface(
-        shape = RectangleShape,
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                tr(R.string.s_wi_fi_ini_tampaknya_memblokir),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            Text(
-                names.joinToString(", ") + tr(R.string.s_terlihat_di_jaringan_tetapi_tidak) +
-                    tr(R.string.s_ini_biasa_terjadi_di_wi) +
-                    tr(R.string.s_gunakan_hotspot_lokal_dari_salah),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            TextButton(onClick = onUseHotspot, contentPadding = PaddingValues(0.dp)) {
-                Text(tr(R.string.s_buka_hotspot_lokal_di_tab))
+private fun PinDialog(peer: PeerDevice, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var pin by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr(R.string.u_pin_title, peer.name)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(tr(R.string.u_pin_body))
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { value -> pin = value.filter { it.isDigit() }.take(4) },
+                    singleLine = true,
+                    label = { Text(tr(R.string.u_pin_label)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(textAlign = TextAlign.Center),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-        }
-    }
-}
-
-/** Safari tabs with the portal open: Android can push the queue to them directly. */
-@Composable
-private fun BrowsersCard(browsers: List<ConnectedBrowser>, hasQueue: Boolean, onOffer: (ConnectedBrowser) -> Unit) {
-    Card(
-        shape = RectangleShape,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            Text(
-                tr(R.string.s_safari_terhubung),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-            )
-            browsers.forEach { browser ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp)
-                ) {
-                    Icon(Icons.Rounded.Language, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp)
-                    ) {
-                        Text(browser.name, style = MaterialTheme.typography.bodyMedium)
-                        Text(browser.address, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    FilledTonalButton(onClick = { onOffer(browser) }, enabled = hasQueue) { Text(tr(R.string.s_kirim_antrean)) }
-                }
-            }
-        }
-    }
+        },
+        confirmButton = { Button(onClick = { onConfirm(pin) }, enabled = pin.length == 4) { Text(tr(R.string.u_send)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr(R.string.u_cancel)) } }
+    )
 }

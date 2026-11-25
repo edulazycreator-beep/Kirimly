@@ -106,7 +106,7 @@ object ResumableUploadStore {
         val legacy = target.legacyFile
         if (legacy != null) {
             RandomAccessFile(legacy, "rw").use { file ->
-                file.setLength(offset)
+                if (file.length() > offset) file.setLength(offset)
                 file.seek(offset)
                 file.write(data, 0, length)
             }
@@ -117,11 +117,11 @@ object ResumableUploadStore {
         pfd.use { descriptor ->
             FileOutputStream(descriptor.fileDescriptor).use { stream ->
                 val channel = stream.channel
-                channel.truncate(offset)
+                // Only a resume after a half-written chunk needs trimming; no fsync per chunk.
+                if (channel.size() > offset) channel.truncate(offset)
                 channel.position(offset)
                 val buffer = ByteBuffer.wrap(data, 0, length)
                 while (buffer.hasRemaining()) channel.write(buffer)
-                channel.force(false)
             }
         }
     }
