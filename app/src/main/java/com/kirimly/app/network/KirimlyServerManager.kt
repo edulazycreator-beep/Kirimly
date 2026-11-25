@@ -44,7 +44,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import io.ktor.utils.io.ByteWriteChannel
-import io.ktor.utils.io.streams.inputStream
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
@@ -384,7 +384,7 @@ class KirimlyServerManager(
                                     mimeType = mime,
                                     expectedSize = expected?.sizeBytes ?: -1L,
                                     peerName = peerName,
-                                    streamProvider = { part.provider().inputStream() }
+                                    streamProvider = { part.provider().toInputStream() }
                                 )
                                 if (result == null) saved += name else failure = result
                             }
