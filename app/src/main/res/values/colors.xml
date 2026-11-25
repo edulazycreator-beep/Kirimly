@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="kirimly_window_background">#FFF8F9FF</color>
+    <color name="kirimly_window_background_dark">#FF111318</color>
+    <color name="ic_launcher_background">#FF1F5FD6</color>
+    <color name="kirimly_brand">#FF1F5FD6</color>
+</resources>

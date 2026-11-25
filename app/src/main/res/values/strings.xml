@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kirimly</string>
+    <string name="share_label">Kirim dengan Kirimly</string>
+
+    <string name="tab_send">Kirim</string>
+    <string name="tab_receive">Terima</string>
+    <string name="tab_history">Riwayat</string>
+
+    <string name="notif_channel_status">Status server Kirimly</string>
+    <string name="notif_channel_status_desc">Menampilkan status server dan progres transfer</string>
+    <string name="notif_channel_requests">Permintaan transfer</string>
+    <string name="notif_channel_requests_desc">Pemberitahuan saat perangkat lain ingin mengirim file</string>
+    <string name="notif_server_starting">Menyiapkan server…</string>
+    <string name="notif_server_running">Server aktif di %1$s</string>
+    <string name="notif_server_error">Server gagal: %1$s</string>
+    <string name="notif_transfers">%1$d transfer berjalan • %2$d%%</string>
+    <string name="notif_stop">Hentikan</string>
+    <string name="notif_accept">Terima</string>
+    <string name="notif_decline">Tolak</string>
+    <string name="notif_request_title">%1$s ingin mengirim file</string>
+    <string name="notif_request_body">%1$d file • %2$s</string>
+</resources>
