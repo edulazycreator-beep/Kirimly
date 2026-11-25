@@ -81,6 +81,8 @@ import com.kirimly.app.data.model.HotspotState
 import com.kirimly.app.data.model.ServerState
 import com.kirimly.app.data.model.TransferProgress
 import com.kirimly.app.ui.MainViewModel
+import com.kirimly.app.network.WifiJoiner
+import com.kirimly.app.ui.components.QrCodeImage
 import com.kirimly.app.ui.components.QrDisplayCard
 import com.kirimly.app.ui.components.TransferProgressCard
 import com.kirimly.app.ui.theme.MonoDigits
@@ -109,7 +111,12 @@ fun ReceiveScreen(
         else viewModel.showMessage("Izin ditolak — gunakan hotspot sistem dan isi SSID manual.")
     }
 
-    LaunchedEffect(Unit) { viewModel.refreshAddress() }
+    val wifiJoinState by viewModel.wifiJoinState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshAddress()
+        viewModel.autoHotspotIfOffline()
+    }
 
     val running = serverState as? ServerState.Running
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -164,11 +171,15 @@ fun ReceiveScreen(
                     serverUrl = qrServerUrl,
                     wifiPayload = wifiPayload,
                     serverCaption = "Pindai dengan Kamera iPhone, lalu buka di Safari.\nPerangkat harus di jaringan Wi-Fi yang sama.",
-                    wifiCaption = "Pindai dengan Kamera iPhone untuk bergabung ke hotspot, lalu beralih ke QR URL Safari."
+                    wifiCaption = "Langkah 1 — pindai dengan Kamera iPhone untuk bergabung ke hotspot HP ini."
                 ) {
                     HotspotControls(
                         state = hotspotState,
                         hasPayload = wifiPayload != null,
+                        serverUrl = qrServerUrl,
+                        joinState = wifiJoinState,
+                        onJoinIphone = viewModel::joinIphoneHotspot,
+                        onLeaveIphone = viewModel::leaveIphoneHotspot,
                         onStart = {
                             val permission = viewModel.hotspotPermission()
                             val granted = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
@@ -377,6 +388,10 @@ private fun ServerStatusCard(
 private fun ColumnScope.HotspotControls(
     state: HotspotState,
     hasPayload: Boolean,
+    serverUrl: String?,
+    joinState: WifiJoiner.State,
+    onJoinIphone: (String, String) -> Unit,
+    onLeaveIphone: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -411,12 +426,14 @@ private fun ColumnScope.HotspotControls(
         }
         is HotspotState.Active -> {
             CredentialsBox(ssid = state.ssid, password = state.password)
+            StepTwo(serverUrl)
             OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                 Text("Matikan Hotspot")
             }
         }
         is HotspotState.Manual -> {
             CredentialsBox(ssid = state.ssid, password = state.password)
+            StepTwo(serverUrl)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Rounded.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -443,6 +460,90 @@ private fun ColumnScope.HotspotControls(
     }
     if (!hasPayload && state is HotspotState.Active) {
         Text("SSID tidak terbaca", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+    }
+    if (state is HotspotState.Idle || state is HotspotState.Failed) {
+        IphoneHotspotJoin(joinState = joinState, onJoin = onJoinIphone, onLeave = onLeaveIphone)
+    }
+}
+
+/** Second scan of the two-scan iPhone flow: once on the hotspot, open Kirimly in Safari. */
+@Composable
+private fun StepTwo(serverUrl: String?) {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    Text(
+        "Langkah 2 — setelah iPhone tersambung, pindai ini untuk membuka Kirimly di Safari.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center
+    )
+    if (serverUrl != null) {
+        QrCodeImage(content = serverUrl)
+    } else {
+        Text("Menunggu server aktif di hotspot…", style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+/** Reverse direction: join the iPhone's Personal Hotspot so the iPhone keeps its mobile data. */
+@Composable
+private fun IphoneHotspotJoin(
+    joinState: WifiJoiner.State,
+    onJoin: (String, String) -> Unit,
+    onLeave: () -> Unit
+) {
+    var ssid by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    Surface(
+        shape = RectangleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Atau gabung ke Personal Hotspot iPhone", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Nyalakan Personal Hotspot di iPhone (aktifkan Maximise Compatibility), lalu isi nama dan sandinya. iPhone tetap memakai data seluler.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            when (joinState) {
+                is WifiJoiner.State.Connected -> {
+                    Text("Tersambung ke ${joinState.ssid}. Pindai QR URL Safari dari iPhone.", style = MaterialTheme.typography.bodyMedium)
+                    OutlinedButton(onClick = onLeave, modifier = Modifier.fillMaxWidth()) { Text("Putuskan") }
+                }
+                is WifiJoiner.State.Connecting -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.size(10.dp))
+                        Text("Menyambung ke ${joinState.ssid}… setujui dialog Android", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                else -> {
+                    if (joinState is WifiJoiner.State.Failed) {
+                        Text(joinState.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                    OutlinedTextField(
+                        value = ssid,
+                        onValueChange = { ssid = it },
+                        label = { Text("Nama hotspot iPhone") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Kata sandi") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { onJoin(ssid, password) },
+                        enabled = ssid.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Gabung") }
+                }
+            }
+        }
     }
 }
 

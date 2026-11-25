@@ -2,6 +2,11 @@
 
 package com.kirimly.app.ui.screens
 
+import androidx.compose.material.icons.rounded.Language
+import com.kirimly.app.data.model.ConnectedBrowser
+import androidx.compose.ui.unit.sp
+import com.kirimly.app.ui.theme.MonoDigits
+import com.kirimly.app.ui.components.FileThumbnail
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.RectangleShape
@@ -102,8 +107,18 @@ fun SendScreen(
         viewModel.addUris(uris)
     }
 
+    val browsers by viewModel.browsers.collectAsStateWithLifecycle()
+    val verificationCode by viewModel.verificationCode.collectAsStateWithLifecycle()
+    val nearbyError by viewModel.nearbyError.collectAsStateWithLifecycle()
+
+    val nearbyPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { viewModel.startNearby() }
+
     DisposableEffect(Unit) {
         viewModel.startDiscovery()
+        if (viewModel.hasNearbyPermissions()) viewModel.startNearby()
+        else nearbyPermissionLauncher.launch(viewModel.nearbyPermissions().toTypedArray())
         onDispose { viewModel.stopDiscovery() }
     }
 
@@ -149,7 +164,7 @@ fun SendScreen(
                     onPeerClick = { peer ->
                         if (queue.isEmpty()) {
                             viewModel.showMessage("Antrean kosong. Tambahkan file atau teks dulu.")
-                        } else if (peer.pinRequired) {
+                        } else if (peer.pinRequired && peer.channel != PeerDevice.CHANNEL_NEARBY) {
                             pinTarget = peer
                         } else {
                             confirmTarget = peer
@@ -163,6 +178,22 @@ fun SendScreen(
             if (unreachablePeers.isNotEmpty()) {
                 item(key = "isolation") {
                     IsolationBanner(names = unreachablePeers, onUseHotspot = onOpenReceive)
+                }
+            }
+
+            if (browsers.isNotEmpty()) {
+                item(key = "browsers") {
+                    BrowsersCard(browsers = browsers, hasQueue = queue.isNotEmpty(), onOffer = viewModel::offerToBrowser)
+                }
+            }
+
+            if (nearbyError != null && peers.isEmpty()) {
+                item(key = "nearbyError") {
+                    Text(
+                        text = nearbyError.orEmpty() + ". Perangkat di Wi-Fi yang sama tetap bisa ditemukan.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -247,6 +278,23 @@ fun SendScreen(
                 }
             }
         }
+    }
+
+    verificationCode?.let { code ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Cocokkan kode ini") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(code, style = MonoDigits.copy(fontSize = 32.sp))
+                    Text(
+                        "Kode yang sama harus tampil di layar penerima. Jika berbeda, minta penerima menolak: ada perangkat lain di tengah koneksi.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {}
+        )
     }
 
     pinTarget?.let { peer ->
@@ -412,19 +460,12 @@ private fun QueueItemRow(item: SharedItem, onRemove: () -> Unit) {
             modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = RectangleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
+            FileThumbnail(
+                uri = (item as? SharedFile)?.uri,
+                mimeType = item.mimeType,
+                fileName = item.displayName,
                 modifier = Modifier.size(42.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = fileIconFor(item.mimeType, item.displayName),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
+            )
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -530,6 +571,42 @@ private fun IsolationBanner(names: List<String>, onUseHotspot: () -> Unit) {
             )
             TextButton(onClick = onUseHotspot, contentPadding = PaddingValues(0.dp)) {
                 Text("Buka hotspot lokal di tab Terima")
+            }
+        }
+    }
+}
+
+/** Safari tabs with the portal open: Android can push the queue to them directly. */
+@Composable
+private fun BrowsersCard(browsers: List<ConnectedBrowser>, hasQueue: Boolean, onOffer: (ConnectedBrowser) -> Unit) {
+    Card(
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(
+                "Safari terhubung",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+            browsers.forEach { browser ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp)
+                ) {
+                    Icon(Icons.Rounded.Language, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp)
+                    ) {
+                        Text(browser.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(browser.address, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    FilledTonalButton(onClick = { onOffer(browser) }, enabled = hasQueue) { Text("Kirim antrean") }
+                }
             }
         }
     }

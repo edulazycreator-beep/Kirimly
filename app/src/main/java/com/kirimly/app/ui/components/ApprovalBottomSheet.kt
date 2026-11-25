@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.components
 
+import androidx.compose.ui.unit.sp
+import com.kirimly.app.ui.theme.MonoDigits
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.toggleable
@@ -157,8 +159,27 @@ fun ApprovalBottomSheet(
                 }
             }
 
+            request.verificationCode?.let { code ->
+                Surface(
+                    shape = RectangleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Kode verifikasi", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(code, style = MonoDigits.copy(fontSize = 28.sp))
+                        Text(
+                            "Pastikan sama dengan kode di layar pengirim sebelum menerima.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             Text(
-                text = "Perangkat: " + request.userAgent.ifBlank { "Tidak diketahui" },
+                text = (if (request.channel == "nearby") "Lewat Nearby (Bluetooth + Wi-Fi Direct) • " else "Perangkat: ") +
+                    request.userAgent.ifBlank { "Tidak diketahui" },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,

@@ -1231,6 +1231,32 @@ class KirimlyServerManager(
         }
     }
 
+    /**
+     * Shows the approval sheet / notification for a request that arrived over another channel
+     * (Nearby Connections). Trusted devices are accepted at once. Returns null on timeout.
+     */
+    suspend fun requestApproval(request: PendingTransferRequest): Boolean? {
+        if (isTrusted(request.deviceId)) {
+            _events.tryEmit(ServerEvent.TrustedAutoAccepted(request))
+            return true
+        }
+        val decision = CompletableDeferred<Boolean>()
+        decisions[request.id] = decision
+        _pendingRequests.update { it + request }
+        _events.tryEmit(ServerEvent.IncomingRequest(request))
+        val result = withTimeoutOrNull(APPROVAL_TIMEOUT_MS) { decision.await() }
+        decisions.remove(request.id)
+        _pendingRequests.update { list -> list.filterNot { it.id == request.id } }
+        return result
+    }
+
+    fun isTrustedDevice(deviceId: String?): Boolean = isTrusted(deviceId)
+
+    /** Lets other channels raise the same snackbar events (file received, text received). */
+    fun emitEvent(event: ServerEvent) {
+        _events.tryEmit(event)
+    }
+
     private fun isTrusted(deviceId: String?): Boolean =
         !deviceId.isNullOrBlank() && trustedDevices.containsKey(deviceId)
 

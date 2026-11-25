@@ -1,5 +1,6 @@
 package com.kirimly.app.ui.components
 
+import androidx.compose.material3.Button
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.rounded.VerifiedUser
@@ -76,6 +77,10 @@ fun PalettePickerSheet(
     onPinInQrChange: (Boolean) -> Unit,
     onConvertHeicChange: (Boolean) -> Unit,
     onRemoveTrusted: (String) -> Unit,
+    onIdleStopChange: (Int) -> Unit,
+    crashLogCount: Int,
+    onShareCrashLogs: () -> Unit,
+    onClearCrashLogs: () -> Unit,
     onShowTutorial: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -205,6 +210,26 @@ fun PalettePickerSheet(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionLabel("Matikan server saat menganggur")
+                Text(
+                    "Saat Kirimly di latar belakang dan tidak ada transfer, server dimatikan untuk menghemat baterai.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val options = listOf(0 to "Tidak", 5 to "5 m", 15 to "15 m", 30 to "30 m", 60 to "60 m")
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    options.forEachIndexed { index, (minutes, label) ->
+                        SegmentedButton(
+                            selected = preferences.idleStopMinutes == minutes,
+                            onClick = { onIdleStopChange(minutes) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                            icon = {}
+                        ) { Text(label) }
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Perangkat tepercaya")
                 if (preferences.trustedDevices.isEmpty()) {
                     Text(
@@ -231,6 +256,22 @@ fun PalettePickerSheet(
                             )
                             TextButton(onClick = { onRemoveTrusted(device.id) }) { Text("Hapus") }
                         }
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionLabel("Log crash")
+                Text(
+                    if (crashLogCount == 0) "Tidak ada crash tercatat. Log hanya disimpan di HP ini."
+                    else "$crashLogCount crash tercatat. Bagikan ke pengembang untuk membantu perbaikan.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (crashLogCount > 0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = onClearCrashLogs, modifier = Modifier.weight(1f)) { Text("Hapus") }
+                        Button(onClick = onShareCrashLogs, modifier = Modifier.weight(1f)) { Text("Bagikan log") }
                     }
                 }
             }

@@ -118,4 +118,7 @@ dependencies {
 
     // QR
     implementation(libs.zxing.core)
+
+    // Nearby Connections (Android ↔ Android without a shared network)
+    implementation(libs.play.services.nearby)
 }

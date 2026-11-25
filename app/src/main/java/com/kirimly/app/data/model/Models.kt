@@ -91,8 +91,16 @@ data class PeerDevice(
     val host: String,
     val port: Int,
     val pinRequired: Boolean,
-    val lastSeen: Long = System.currentTimeMillis()
+    val lastSeen: Long = System.currentTimeMillis(),
+    /** "lan" = HTTP over Wi-Fi/hotspot, "nearby" = Nearby Connections (Bluetooth + Wi-Fi Direct). */
+    val channel: String = CHANNEL_LAN,
+    val deviceId: String? = null
 ) {
+    companion object {
+        const val CHANNEL_LAN = "lan"
+        const val CHANNEL_NEARBY = "nearby"
+    }
+
     val initials: String
         get() = name.split(' ', '-', '_')
             .filter { it.isNotBlank() }

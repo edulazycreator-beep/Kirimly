@@ -102,7 +102,7 @@ fun QrDisplayCard(
                 ) {
                     val payload = if (target == QrMode.SERVER_URL) serverUrl else wifiPayload
                     if (payload != null) {
-                        QrImage(content = payload)
+                        QrCodeImage(content = payload)
                         Text(
                             text = if (target == QrMode.SERVER_URL) serverCaption else wifiCaption,
                             style = MaterialTheme.typography.bodyMedium,
@@ -120,13 +120,13 @@ fun QrDisplayCard(
 }
 
 @Composable
-private fun QrImage(content: String) {
+fun QrCodeImage(content: String, modifier: Modifier = Modifier) {
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = content) {
         value = withContext(Dispatchers.Default) { QrCodeGenerator.generate(content) }
     }
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
+        modifier = modifier
             .widthIn(max = 260.dp)
             .fillMaxWidth()
             .aspectRatio(1f)

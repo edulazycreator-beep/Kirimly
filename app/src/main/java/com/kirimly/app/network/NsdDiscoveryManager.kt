@@ -270,7 +270,8 @@ class NsdDiscoveryManager(
             host = host,
             port = info.port,
             pinRequired = serverInfo.pinRequired,
-            lastSeen = System.currentTimeMillis()
+            lastSeen = System.currentTimeMillis(),
+            deviceId = serverInfo.deviceId
         )
         _peers.update { list -> list.filterNot { it.id == peer.id || (it.host == peer.host && it.port == peer.port) } + peer }
     }

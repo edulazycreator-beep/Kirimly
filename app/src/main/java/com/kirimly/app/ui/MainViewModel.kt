@@ -1,6 +1,10 @@
 package com.kirimly.app.ui
 
+import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import com.kirimly.app.network.WifiJoiner
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -71,7 +75,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val sharedItems: StateFlow<List<SharedItem>> = serverManager.sharedItems
     val pendingRequests: StateFlow<List<PendingTransferRequest>> = serverManager.pendingRequests
     val activeTransfers: StateFlow<List<TransferProgress>> = container.transferTracker.active
-    val peers: StateFlow<List<PeerDevice>> = container.nsdManager.peers
+    /** LAN peers first; Nearby peers only when the same device is not already reachable on the LAN. */
+    val peers: StateFlow<List<PeerDevice>> = combine(container.nsdManager.peers, container.nearbyManager.peers) { lan, nearby ->
+        val lanIds = lan.mapNotNull { it.deviceId }.toSet()
+        lan + nearby.filterNot { it.deviceId != null && it.deviceId in lanIds }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val nearbyActive: StateFlow<Boolean> = container.nearbyManager.active
+    val nearbyError: StateFlow<String?> = container.nearbyManager.lastError
+    val wifiJoinState: StateFlow<WifiJoiner.State> = container.wifiJoiner.state
     val isDiscovering: StateFlow<Boolean> = container.nsdManager.isDiscovering
     val hotspotState: StateFlow<HotspotState> = container.hotspotManager.state
     val unreachablePeers: StateFlow<List<String>> = container.nsdManager.unreachablePeers
@@ -319,6 +330,59 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ------------------------------------------------------------------ discovery
 
+    /** Runtime permissions Nearby Connections needs on this Android version. */
+    fun nearbyPermissions(): List<String> = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            add(Manifest.permission.BLUETOOTH_SCAN)
+            add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            add(Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.S..Build.VERSION_CODES.S_V2) add(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
+    fun hasNearbyPermissions(): Boolean = nearbyPermissions().all {
+        ContextCompat.checkSelfPermission(getApplication(), it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun startNearby() {
+        if (hasNearbyPermissions()) container.nearbyManager.start()
+    }
+
+    fun joinIphoneHotspot(ssid: String, password: String) {
+        if (ssid.isBlank()) {
+            _messages.trySend("Isi nama hotspot iPhone")
+            return
+        }
+        container.wifiJoiner.join(ssid, password) {
+            viewModelScope.launch {
+                delay(1_500L)
+                serverManager.refreshAddress()
+                if (serverState.value is ServerState.Stopped) startServer()
+                _qrMode.value = QrMode.SERVER_URL
+            }
+        }
+    }
+
+    fun leaveIphoneHotspot() {
+        container.wifiJoiner.disconnect()
+        serverManager.refreshAddress()
+    }
+
+    /** True when this phone has a usable LAN / hotspot address right now. */
+    fun hasLanAddress(): Boolean = NetworkUtils.getLocalIpv4Address() != null
+
+    /** Receive tab opened without Wi-Fi: start the local hotspot and show the two-scan flow. */
+    fun autoHotspotIfOffline() {
+        if (hasLanAddress()) return
+        if (hotspotState.value !is HotspotState.Idle) return
+        if (!container.hotspotManager.hasPermission()) return
+        _qrMode.value = QrMode.WIFI_HOTSPOT
+        container.hotspotManager.start()
+    }
+
     fun startDiscovery() {
         container.nsdManager.startDiscovery()
     }
@@ -436,8 +500,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _sendingPeerId.value = peer.id
         _messages.trySend("Menunggu persetujuan dari ${peer.name}…")
         viewModelScope.launch {
-            val result = container.peerClient.sendItems(peer, pin, items, preferences.value.deviceNickname) { code ->
-                _verificationCode.value = code
+            val result = if (peer.channel == PeerDevice.CHANNEL_NEARBY) {
+                container.nearbyManager.send(peer, items, preferences.value.deviceNickname) { code ->
+                    _verificationCode.value = code
+                }
+            } else {
+                container.peerClient.sendItems(peer, pin, items, preferences.value.deviceNickname) { code ->
+                    _verificationCode.value = code
+                }
             }
             _verificationCode.value = null
             _sendingPeerId.value = null
@@ -517,6 +587,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearFinishedTransfers() {
         container.transferTracker.clearFinished()
+    }
+
+    override fun onCleared() {
+        container.nearbyManager.stop()
+        super.onCleared()
     }
 
     companion object {

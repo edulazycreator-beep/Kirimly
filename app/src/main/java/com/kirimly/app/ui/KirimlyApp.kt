@@ -1,5 +1,8 @@
 package com.kirimly.app.ui
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import android.content.Intent
 import android.Manifest
 import android.app.Activity
 import androidx.activity.compose.BackHandler
@@ -101,6 +104,8 @@ fun KirimlyApp(viewModel: MainViewModel) {
     val pendingRequests by viewModel.pendingRequests.collectAsStateWithLifecycle()
     val activeTransfers by viewModel.activeTransfers.collectAsStateWithLifecycle()
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    val crashLogCount by viewModel.crashLogCount.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     var permissionsAsked by rememberSaveable { mutableStateOf(false) }
 
     // ---- Runtime permissions (notifications on 13+, legacy storage on 8–9) ----
@@ -256,6 +261,7 @@ fun KirimlyApp(viewModel: MainViewModel) {
 
     // ---- Theme & palette customiser ----
     if (showSettings) {
+        LaunchedEffect(Unit) { viewModel.refreshCrashLogs() }
         val systemDark = isSystemInDarkTheme()
         val darkActive = when (preferences.themeMode) {
             ThemeMode.SYSTEM -> systemDark
@@ -273,6 +279,24 @@ fun KirimlyApp(viewModel: MainViewModel) {
             onPinInQrChange = viewModel::setPinInQr,
             onConvertHeicChange = viewModel::setConvertHeic,
             onRemoveTrusted = viewModel::removeTrustedDevice,
+            onIdleStopChange = viewModel::setIdleStopMinutes,
+            crashLogCount = crashLogCount,
+            onShareCrashLogs = {
+                scope.launch {
+                    val uri = viewModel.crashReportUri() ?: return@launch
+                    val share = Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_STREAM, uri)
+                        .putExtra(Intent.EXTRA_SUBJECT, "Laporan crash Kirimly")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    try {
+                        context.startActivity(Intent.createChooser(share, "Bagikan log crash"))
+                    } catch (_: Exception) {
+                        viewModel.showMessage("Tidak ada aplikasi untuk membagikan log")
+                    }
+                }
+            },
+            onClearCrashLogs = viewModel::clearCrashLogs,
             onShowTutorial = {
                 showSettings = false
                 viewModel.replayOnboarding()

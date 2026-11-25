@@ -1,5 +1,6 @@
 package com.kirimly.app.ui.screens
 
+import com.kirimly.app.ui.components.FileThumbnail
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.RectangleShape
@@ -231,19 +232,12 @@ private fun HistoryRow(
         Column(modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box {
-                    Surface(
-                        shape = RectangleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                    FileThumbnail(
+                        uri = item.uri?.takeIf { !item.isText }?.let(Uri::parse),
+                        mimeType = item.mimeType,
+                        fileName = item.fileName,
                         modifier = Modifier.size(46.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = fileIconFor(item.mimeType, item.fileName),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
+                    )
                     Surface(
                         shape = CircleShape,
                         color = if (received) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
