@@ -182,7 +182,7 @@ private fun PeerBubble(peer: PeerDevice, onClick: () -> Unit) {
         Box {
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.tertiaryContainer,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 shadowElevation = 3.dp,
                 modifier = Modifier.size(46.dp)
             ) {
@@ -191,7 +191,7 @@ private fun PeerBubble(peer: PeerDevice, onClick: () -> Unit) {
                         text = peer.initials,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -206,7 +206,7 @@ private fun PeerBubble(peer: PeerDevice, onClick: () -> Unit) {
                     Icon(
                         imageVector = Icons.Rounded.Lock,
                         contentDescription = "Memerlukan PIN",
-                        tint = MaterialTheme.colorScheme.tertiary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(3.dp)
                     )
                 }

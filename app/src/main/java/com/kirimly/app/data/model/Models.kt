@@ -15,12 +15,13 @@ enum class ThemeMode(val displayName: String) {
     DARK("Gelap");
 
     companion object {
-        fun fromName(name: String?): ThemeMode = entries.firstOrNull { it.name == name } ?: SYSTEM
+        fun fromName(name: String?): ThemeMode = entries.firstOrNull { it.name == name } ?: DARK
     }
 }
 
 /** Curated Material 3 colour palettes. */
 enum class AppPalette(val displayName: String, val previewArgb: Long) {
+    MIDNIGHT_MONO("Midnight Mono", 0xFF000000),
     OCEAN_COBALT("Ocean Cobalt", 0xFF1F5FD6),
     EMERALD_MINT("Emerald Mint", 0xFF0F7B5C),
     SUNSET_CORAL("Sunset Coral", 0xFFD9534A),
@@ -28,7 +29,7 @@ enum class AppPalette(val displayName: String, val previewArgb: Long) {
     GRAPHITE_SLATE("Graphite Slate", 0xFF3D4F63);
 
     companion object {
-        fun fromName(name: String?): AppPalette = entries.firstOrNull { it.name == name } ?: OCEAN_COBALT
+        fun fromName(name: String?): AppPalette = entries.firstOrNull { it.name == name } ?: MIDNIGHT_MONO
     }
 }
 

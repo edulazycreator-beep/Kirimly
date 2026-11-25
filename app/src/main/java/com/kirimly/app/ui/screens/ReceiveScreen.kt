@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.RectangleShape
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -25,7 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -236,7 +237,8 @@ private fun ServerStatusCard(
         label = "statusDot"
     )
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
             containerColor = if (running != null) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surfaceContainerLow
@@ -288,7 +290,7 @@ private fun ServerStatusCard(
 
             if (running != null) {
                 Surface(
-                    shape = RoundedCornerShape(50),
+                    shape = CircleShape,
                     color = MaterialTheme.colorScheme.surface,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -299,7 +301,6 @@ private fun ServerStatusCard(
                         Text(
                             text = "${running.ip}:${running.port}",
                             style = MaterialTheme.typography.titleMedium,
-                            fontFamily = FontFamily.Monospace,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
@@ -312,7 +313,7 @@ private fun ServerStatusCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RectangleShape,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier.weight(1f)
                     ) {
@@ -348,7 +349,6 @@ private fun ServerStatusCard(
                 Button(
                     onClick = onToggle,
                     enabled = serverState != ServerState.Starting,
-                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
@@ -383,7 +383,7 @@ private fun ColumnScope.HotspotControls(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Button(onClick = onStart, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
+            Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                 Icon(Icons.Rounded.WifiTethering, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text("Aktifkan Hotspot Lokal")
@@ -400,19 +400,19 @@ private fun ColumnScope.HotspotControls(
         }
         is HotspotState.Active -> {
             CredentialsBox(ssid = state.ssid, password = state.password)
-            OutlinedButton(onClick = onStop, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                 Text("Matikan Hotspot")
             }
         }
         is HotspotState.Manual -> {
             CredentialsBox(ssid = state.ssid, password = state.password)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onOpenSettings, shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Rounded.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
                     Text("Pengaturan")
                 }
-                FilledTonalButton(onClick = onStop, shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f)) {
+                FilledTonalButton(onClick = onStop, modifier = Modifier.weight(1f)) {
                     Text("Ubah")
                 }
             }
@@ -420,10 +420,10 @@ private fun ColumnScope.HotspotControls(
         is HotspotState.Failed -> {
             InfoBanner(state.reason)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onReset, shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = onReset, modifier = Modifier.weight(1f)) {
                     Text("Coba lagi")
                 }
-                FilledTonalButton(onClick = onOpenSettings, shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f)) {
+                FilledTonalButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) {
                     Text("Hotspot sistem")
                 }
             }
@@ -444,7 +444,7 @@ private fun ManualHotspotForm(
     onSubmit: (String, String) -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RectangleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -455,7 +455,7 @@ private fun ManualHotspotForm(
                 onValueChange = onSsidChange,
                 label = { Text("Nama hotspot (SSID)") },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
+                shape = RectangleShape,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
@@ -465,13 +465,12 @@ private fun ManualHotspotForm(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = RoundedCornerShape(14.dp),
+                shape = RectangleShape,
                 modifier = Modifier.fillMaxWidth()
             )
             Button(
                 onClick = { onSubmit(ssid, password) },
                 enabled = ssid.isNotBlank(),
-                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Buat QR Wi-Fi") }
         }
@@ -481,7 +480,7 @@ private fun ManualHotspotForm(
 @Composable
 private fun CredentialsBox(ssid: String, password: String) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RectangleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -504,7 +503,6 @@ private fun LabeledValue(label: String, value: String) {
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
             modifier = Modifier.weight(0.65f)
         )
     }
@@ -513,7 +511,7 @@ private fun LabeledValue(label: String, value: String) {
 @Composable
 private fun InfoBanner(text: String) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RectangleShape,
         color = MaterialTheme.colorScheme.errorContainer,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -529,7 +527,8 @@ private fun InfoBanner(text: String) {
 @Composable
 private fun HowToCard() {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth()
     ) {

@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.QrCode2
@@ -65,7 +66,8 @@ fun QrDisplayCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Column(
@@ -128,7 +130,7 @@ private fun QrImage(content: String) {
             .widthIn(max = 260.dp)
             .fillMaxWidth()
             .aspectRatio(1f)
-            .background(Color.White, RoundedCornerShape(20.dp))
+            .background(Color.White, RectangleShape)
             .padding(14.dp)
     ) {
         val image = bitmap
@@ -153,7 +155,7 @@ private fun QrPlaceholder(text: String) {
             .widthIn(max = 260.dp)
             .fillMaxWidth()
             .aspectRatio(1f)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RectangleShape)
             .padding(24.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

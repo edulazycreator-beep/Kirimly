@@ -1,5 +1,6 @@
 package com.kirimly.app.ui.components
 
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -140,7 +140,7 @@ fun PalettePickerSheet(
                         if (nickname.isNotBlank()) onNicknameChange(nickname)
                         focusManager.clearFocus()
                     }),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RectangleShape,
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (nickname != preferences.deviceNickname && nickname.isNotBlank()) {
@@ -152,7 +152,7 @@ fun PalettePickerSheet(
             }
 
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RectangleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -193,8 +193,8 @@ private fun PaletteRow(palette: AppPalette, selected: Boolean, dark: Boolean, on
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(BorderStroke(if (selected) 2.dp else 1.dp, borderColor), RoundedCornerShape(16.dp))
+            .clip(RectangleShape)
+            .border(BorderStroke(if (selected) 2.dp else 1.dp, borderColor), RectangleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

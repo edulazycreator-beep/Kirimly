@@ -75,8 +75,8 @@ class UserPreferencesRepository(context: Context) {
         }
 
         val DEFAULT = UserPreferences(
-            themeMode = ThemeMode.SYSTEM,
-            palette = AppPalette.OCEAN_COBALT,
+            themeMode = ThemeMode.DARK,
+            palette = AppPalette.MIDNIGHT_MONO,
             deviceNickname = defaultNickname(),
             pinRequired = true
         )

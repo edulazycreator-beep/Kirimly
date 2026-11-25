@@ -2,7 +2,6 @@ package com.kirimly.app.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -12,13 +11,19 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.kirimly.app.R
 import com.kirimly.app.data.model.AppPalette
 import com.kirimly.app.data.model.ThemeMode
 
@@ -39,6 +44,12 @@ private data class PaletteTones(
 )
 
 private fun lightTones(palette: AppPalette): PaletteTones = when (palette) {
+    AppPalette.MIDNIGHT_MONO -> PaletteTones(
+        Color(0xFF040404), Color(0xFFEFEDEF), Color(0xFFDDDBDD), Color(0xFF040404),
+        Color(0xFF2B2B2B), Color(0xFFDDDBDD), Color(0xFF040404),
+        Color(0xFF1C5A9E), Color(0xFFD9EAFF), Color(0xFF04213F),
+        Color(0xFFEFEDEF), Color(0xFFDDDBDD)
+    )
     AppPalette.OCEAN_COBALT -> PaletteTones(
         Color(0xFF1F5FD6), Color.White, Color(0xFFDCE6FF), Color(0xFF001A43),
         Color(0xFF4F6083), Color(0xFFD8E2FF), Color(0xFF0A1B3C),
@@ -72,6 +83,12 @@ private fun lightTones(palette: AppPalette): PaletteTones = when (palette) {
 }
 
 private fun darkTones(palette: AppPalette): PaletteTones = when (palette) {
+    AppPalette.MIDNIGHT_MONO -> PaletteTones(
+        Color(0xFFEDEDED), Color(0xFF040404), Color(0xFF1D1D1D), Color(0xFFF9F8F9),
+        Color(0xFFE5E5E4), Color(0xFF1D1D1D), Color(0xFFF9F8F9),
+        Color(0xFFA3CFFF), Color(0xFF0F2742), Color(0xFFD6E9FF),
+        Color(0xFF000000), Color(0xFF1D1D1D)
+    )
     AppPalette.OCEAN_COBALT -> PaletteTones(
         Color(0xFFB0C6FF), Color(0xFF002D6F), Color(0xFF0F449C), Color(0xFFDCE6FF),
         Color(0xFFBAC6EA), Color(0xFF37476A), Color(0xFFD8E2FF),
@@ -104,7 +121,92 @@ private fun darkTones(palette: AppPalette): PaletteTones = when (palette) {
     )
 }
 
+/**
+ * Midnight Mono: black ground, near-white type and actions, hairline structure.
+ * Colour appears only for status (accent #A3CFFF as tertiary, error red).
+ */
+private fun midnightMonoScheme(dark: Boolean): ColorScheme = if (dark) {
+    darkColorScheme(
+        primary = Color(0xFFEDEDED),
+        onPrimary = Color(0xFF040404),
+        primaryContainer = Color(0xFF1D1D1D),
+        onPrimaryContainer = Color(0xFFF9F8F9),
+        inversePrimary = Color(0xFF040404),
+        secondary = Color(0xFFE5E5E4),
+        onSecondary = Color(0xFF040404),
+        secondaryContainer = Color(0xFF1D1D1D),
+        onSecondaryContainer = Color(0xFFF9F8F9),
+        tertiary = Color(0xFFA3CFFF),
+        onTertiary = Color(0xFF040404),
+        tertiaryContainer = Color(0xFF0F2742),
+        onTertiaryContainer = Color(0xFFD6E9FF),
+        background = Color(0xFF000000),
+        onBackground = Color(0xFFF9F8F9),
+        surface = Color(0xFF000000),
+        onSurface = Color(0xFFF9F8F9),
+        surfaceVariant = Color(0xFF1D1D1D),
+        onSurfaceVariant = Color(0xFFD6D6D5),
+        surfaceTint = Color.Transparent,
+        inverseSurface = Color(0xFFEFEDEF),
+        inverseOnSurface = Color(0xFF040404),
+        error = Color(0xFFFF8A80),
+        onError = Color(0xFF040404),
+        errorContainer = Color(0xFF2A0B0B),
+        onErrorContainer = Color(0xFFFFD6D2),
+        outline = Color(0xFF8C8C8B),
+        outlineVariant = Color(0xFF1D1D1D),
+        scrim = Color.Black,
+        surfaceBright = Color(0xFF1D1D1D),
+        surfaceDim = Color(0xFF000000),
+        surfaceContainerLowest = Color(0xFF000000),
+        surfaceContainerLow = Color(0xFF0B0B0B),
+        surfaceContainer = Color(0xFF0B0B0B),
+        surfaceContainerHigh = Color(0xFF141414),
+        surfaceContainerHighest = Color(0xFF1D1D1D)
+    )
+} else {
+    lightColorScheme(
+        primary = Color(0xFF040404),
+        onPrimary = Color(0xFFEFEDEF),
+        primaryContainer = Color(0xFFDDDBDD),
+        onPrimaryContainer = Color(0xFF040404),
+        inversePrimary = Color(0xFFEDEDED),
+        secondary = Color(0xFF2B2B2B),
+        onSecondary = Color(0xFFEFEDEF),
+        secondaryContainer = Color(0xFFDDDBDD),
+        onSecondaryContainer = Color(0xFF040404),
+        tertiary = Color(0xFF1C5A9E),
+        onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFD9EAFF),
+        onTertiaryContainer = Color(0xFF04213F),
+        background = Color(0xFFEFEDEF),
+        onBackground = Color(0xFF040404),
+        surface = Color(0xFFEFEDEF),
+        onSurface = Color(0xFF040404),
+        surfaceVariant = Color(0xFFDDDBDD),
+        onSurfaceVariant = Color(0xFF3A3A3A),
+        surfaceTint = Color.Transparent,
+        inverseSurface = Color(0xFF040404),
+        inverseOnSurface = Color(0xFFF9F8F9),
+        error = Color(0xFFB3261E),
+        onError = Color.White,
+        errorContainer = Color(0xFFFFDAD6),
+        onErrorContainer = Color(0xFF410002),
+        outline = Color(0xFF6E6E6E),
+        outlineVariant = Color(0xFFD4D2D4),
+        scrim = Color.Black,
+        surfaceBright = Color(0xFFF8F7F8),
+        surfaceDim = Color(0xFFE2E0E2),
+        surfaceContainerLowest = Color(0xFFFFFFFF),
+        surfaceContainerLow = Color(0xFFF8F7F8),
+        surfaceContainer = Color(0xFFF8F7F8),
+        surfaceContainerHigh = Color(0xFFE8E6E8),
+        surfaceContainerHighest = Color(0xFFDDDBDD)
+    )
+}
+
 fun kirimlyColorScheme(palette: AppPalette, dark: Boolean): ColorScheme {
+    if (palette == AppPalette.MIDNIGHT_MONO) return midnightMonoScheme(dark)
     return if (dark) {
         val t = darkTones(palette)
         darkColorScheme(
@@ -188,26 +290,59 @@ fun kirimlyColorScheme(palette: AppPalette, dark: Boolean): ColorScheme {
     }
 }
 
+/** Host Grotesk variable font (wght 300–800), bundled in res/font under the SIL OFL 1.1. */
+@OptIn(ExperimentalTextApi::class)
+private fun hostGrotesk(weight: Int): Font = Font(
+    resId = R.font.host_grotesk,
+    weight = FontWeight(weight),
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight))
+)
+
+val HostGrotesk = FontFamily(
+    hostGrotesk(300),
+    hostGrotesk(400),
+    hostGrotesk(500),
+    hostGrotesk(600),
+    hostGrotesk(700)
+)
+
 private val KirimlyTypography = Typography().let { base ->
+    fun TextStyle.host(weight: FontWeight, tracking: Double = 0.0): TextStyle =
+        copy(fontFamily = HostGrotesk, fontWeight = weight, letterSpacing = tracking.sp)
     base.copy(
-        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.4).sp),
-        headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp),
-        titleLarge = base.titleLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp),
-        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        titleSmall = base.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-        bodyLarge = base.bodyLarge.copy(lineHeight = 24.sp)
+        displayLarge = base.displayLarge.host(FontWeight.Medium, -1.6),
+        displayMedium = base.displayMedium.host(FontWeight.Medium, -1.2),
+        displaySmall = base.displaySmall.host(FontWeight.Medium, -0.9),
+        headlineLarge = base.headlineLarge.host(FontWeight.Medium, -0.8),
+        headlineMedium = base.headlineMedium.host(FontWeight.Medium, -0.6),
+        headlineSmall = base.headlineSmall.host(FontWeight.Medium, -0.4),
+        titleLarge = base.titleLarge.host(FontWeight.Medium, -0.2),
+        titleMedium = base.titleMedium.host(FontWeight.Medium, -0.1),
+        titleSmall = base.titleSmall.host(FontWeight.Medium),
+        bodyLarge = base.bodyLarge.host(FontWeight.Normal).copy(lineHeight = 24.sp),
+        bodyMedium = base.bodyMedium.host(FontWeight.Normal),
+        bodySmall = base.bodySmall.host(FontWeight.Normal),
+        labelLarge = base.labelLarge.host(FontWeight.Medium),
+        labelMedium = base.labelMedium.host(FontWeight.Medium),
+        labelSmall = base.labelSmall.host(FontWeight.Medium)
     )
 }
 
-val MonoDigits = TextStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = 6.sp)
+val MonoDigits = TextStyle(
+    fontFamily = HostGrotesk,
+    fontWeight = FontWeight.Medium,
+    fontSize = 22.sp,
+    letterSpacing = 6.sp,
+    fontFeatureSettings = "tnum"
+)
 
+/** Sharp surfaces everywhere; controls (buttons, pills) stay fully rounded by Material default. */
 private val KirimlyShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    extraSmall = RectangleShape,
+    small = RectangleShape,
+    medium = RectangleShape,
+    large = RectangleShape,
+    extraLarge = RectangleShape
 )
 
 @Composable

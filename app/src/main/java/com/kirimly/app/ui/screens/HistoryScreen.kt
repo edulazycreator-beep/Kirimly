@@ -1,5 +1,8 @@
 package com.kirimly.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.RectangleShape
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -19,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
@@ -150,7 +152,7 @@ fun HistoryScreen(
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RectangleShape,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -221,7 +223,8 @@ private fun HistoryRow(
     var menuOpen by remember { mutableStateOf(false) }
     val received = item.direction == TransferDirection.RECEIVED
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -229,7 +232,7 @@ private fun HistoryRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box {
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RectangleShape,
                         color = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.size(46.dp)
                     ) {
@@ -242,8 +245,8 @@ private fun HistoryRow(
                         }
                     }
                     Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (received) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary,
+                        shape = CircleShape,
+                        color = if (received) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
                         modifier = Modifier
                             .size(18.dp)
                             .align(Alignment.BottomEnd)
@@ -251,7 +254,7 @@ private fun HistoryRow(
                         Icon(
                             imageVector = if (received) Icons.Rounded.ArrowDownward else Icons.Rounded.ArrowUpward,
                             contentDescription = if (received) "Diterima" else "Dikirim",
-                            tint = if (received) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSecondary,
+                            tint = if (received) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(2.dp)
                         )
                     }
@@ -307,13 +310,13 @@ private fun HistoryRow(
             Row(modifier = Modifier.padding(end = 12.dp)) {
                 Spacer(Modifier.weight(1f))
                 if (item.isText) {
-                    FilledTonalButton(onClick = onCopy, shape = RoundedCornerShape(12.dp)) {
+                    FilledTonalButton(onClick = onCopy) {
                         Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
                         Text("Salin Teks")
                     }
                 } else {
-                    FilledTonalButton(onClick = onOpen, shape = RoundedCornerShape(12.dp), enabled = item.uri != null) {
+                    FilledTonalButton(onClick = onOpen, enabled = item.uri != null) {
                         Icon(Icons.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
                         Text("Buka File")

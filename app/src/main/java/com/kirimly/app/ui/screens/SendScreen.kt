@@ -2,6 +2,9 @@
 
 package com.kirimly.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -20,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AttachFile
@@ -160,7 +162,6 @@ fun SendScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
                         onClick = { pickFiles.launch(arrayOf("*/*")) },
-                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(54.dp)
@@ -174,7 +175,6 @@ fun SendScreen(
                             val clip = viewModel.readClipboardText()
                             if (clip == null) viewModel.showMessage("Clipboard kosong") else viewModel.addText(clip)
                         },
-                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(54.dp)
@@ -209,7 +209,7 @@ fun SendScreen(
                     Spacer(Modifier.size(8.dp))
                     if (queue.isNotEmpty()) {
                         Surface(
-                            shape = RoundedCornerShape(50),
+                            shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
@@ -279,7 +279,8 @@ private fun RadarCard(
     onToggleServer: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -308,7 +309,7 @@ private fun RadarCard(
             RadarPulseCanvas(isScanning = isDiscovering, peers = peers, onPeerClick = onPeerClick)
 
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RectangleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -349,7 +350,8 @@ private fun TextComposerCard(
     onAdd: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier
             .fillMaxWidth()
@@ -372,14 +374,13 @@ private fun TextComposerCard(
                 placeholder = { Text("Ketik pesan, catatan, atau URL…") },
                 minLines = 2,
                 maxLines = 6,
-                shape = RoundedCornerShape(16.dp),
+                shape = RectangleShape,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                 modifier = Modifier.fillMaxWidth()
             )
             AnimatedVisibility(visible = text.isNotBlank()) {
                 Button(
                     onClick = onAdd,
-                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Rounded.PlaylistAdd, contentDescription = null)
@@ -394,7 +395,8 @@ private fun TextComposerCard(
 @Composable
 private fun QueueItemRow(item: SharedItem, onRemove: () -> Unit) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -403,7 +405,7 @@ private fun QueueItemRow(item: SharedItem, onRemove: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RectangleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.size(42.dp)
             ) {
@@ -486,7 +488,7 @@ private fun PinEntryDialog(peer: PeerDevice, onDismiss: () -> Unit, onConfirm: (
                     placeholder = { Text("• • • •") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     textStyle = MaterialTheme.typography.headlineSmall.copy(textAlign = TextAlign.Center),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RectangleShape,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

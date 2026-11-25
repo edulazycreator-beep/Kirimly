@@ -37,6 +37,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -104,6 +105,15 @@ class KirimlyServerManager(
     }
 
     private val secureRandom = SecureRandom()
+
+    /** Host Grotesk for the Safari portal, served locally so it works on an offline hotspot. */
+    private val portalFont: ByteArray? by lazy {
+        try {
+            appContext.assets.open("host-grotesk.woff2").use { it.readBytes() }
+        } catch (e: IOException) {
+            null
+        }
+    }
     private val engineMutex = Mutex()
     private var engine: ApplicationEngine? = null
 
@@ -270,6 +280,16 @@ class KirimlyServerManager(
             get("/") {
                 call.response.header(HttpHeaders.CacheControl, "no-store")
                 call.respondText(IosWebPortalHtml.PAGE, ContentType.Text.Html.withCharset(Charsets.UTF_8))
+            }
+
+            get("/assets/host-grotesk.woff2") {
+                val bytes = portalFont
+                if (bytes == null) {
+                    call.respond(HttpStatusCode.NotFound, SimpleResponse(ok = false, message = "Font tidak tersedia"))
+                    return@get
+                }
+                call.response.header(HttpHeaders.CacheControl, "public, max-age=604800, immutable")
+                call.respondBytes(bytes, ContentType("font", "woff2"))
             }
 
             get("/api/info") {
