@@ -2,6 +2,7 @@ package com.kirimly.app.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -11,7 +12,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -337,12 +337,14 @@ val MonoDigits = TextStyle(
 )
 
 /** Sharp surfaces everywhere; controls (buttons, pills) stay fully rounded by Material default. */
+private val SharpCorner = RoundedCornerShape(0.dp)
+
 private val KirimlyShapes = Shapes(
-    extraSmall = RectangleShape,
-    small = RectangleShape,
-    medium = RectangleShape,
-    large = RectangleShape,
-    extraLarge = RectangleShape
+    extraSmall = SharpCorner,
+    small = SharpCorner,
+    medium = SharpCorner,
+    large = SharpCorner,
+    extraLarge = SharpCorner
 )
 
 @Composable
