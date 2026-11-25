@@ -53,12 +53,11 @@ ui/        Theme (5 palet × terang/gelap), komponen, MainViewModel, layar Kirim
 - Release build memakai R8 tetapi belum dikonfigurasi signing — tambahkan `signingConfigs` sendiri.
 - Portal web memakai HTTP biasa di jaringan lokal; `navigator.clipboard` di Safari memakai fallback `execCommand`.
 
-## Tambahan v1.2
+## v1.3 — disederhanakan
 
-- **Nearby Connections**: Android ↔ Android tanpa jaringan bersama (Bluetooth LE → Wi-Fi Direct), kode verifikasi di kedua layar.
-- **iPhone**: hotspot lokal otomatis saat tanpa Wi-Fi, alur dua pindaian (QR Wi-Fi lalu QR Safari), atau Android bergabung ke Personal Hotspot iPhone.
-- **Tahan aplikasi tertutup**: sesi upload & token disimpan di Room (`upload_sessions`, `approved_tokens`), digest dibangun ulang dari file saat server hidup lagi.
-- **Kirim ke Safari**: tab Safari yang terhubung muncul di tab Kirim; Android bisa mendorong antrean, Safari menampilkan prompt Unduh.
-- **Lainnya**: thumbnail (`/api/thumbnail/{id}`), auto-stop saat menganggur, log crash lokal, versionCode dari CI.
-- **Bahasa**: English (default) + Indonesia (`values-in`), pemilih bahasa per aplikasi Android 13+, portal mengikuti bahasa browser.
-- **Play Store**: lihat `docs/` (kebijakan privasi, listing, data safety, izin, checklist).
+- **Satu metode:** semua perangkat di Wi-Fi yang sama (atau hotspot yang dinyalakan sendiri). Nearby, hotspot lokal di dalam aplikasi, dan gabung ke hotspot iPhone dihapus.
+- **Server selalu aktif** selama aplikasi terbuka; mati sendiri setelah 15 menit menganggur di latar belakang.
+- **Kirim:** 1) pilih yang mau dikirim, 2) pilih tujuan (Android di Wi-Fi yang sama + Safari yang terhubung).
+- **Terima:** satu QR besar (berisi kode, jadi iPhone tidak perlu mengetik PIN) + petunjuk singkat.
+- **Kecepatan:** chunk 8 MB, tanpa fsync per chunk, hash hanya sekali dan paralel dengan upload di Safari, buffer unduhan 512 KB.
+- Tetap ada: lanjut otomatis setelah putus, cek SHA-256, enkripsi Android↔Android, unggah folder, ZIP, thumbnail, dua bahasa, dokumen Play Store di `docs/`.
