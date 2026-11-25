@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kirimly.app.R
 import com.kirimly.app.network.QrCodeGenerator
@@ -26,18 +27,18 @@ import kotlinx.coroutines.withContext
 
 /** High-contrast QR (always black on white, whatever the theme) so phone cameras read it instantly. */
 @Composable
-fun QrCodeImage(content: String, modifier: Modifier = Modifier) {
+fun QrCodeImage(content: String, modifier: Modifier = Modifier, maxSize: Dp = 280.dp) {
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = content) {
         value = withContext(Dispatchers.Default) { QrCodeGenerator.generate(content) }
     }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .widthIn(max = 280.dp)
+            .widthIn(max = maxSize)
             .fillMaxWidth()
             .aspectRatio(1f)
             .background(Color.White, RectangleShape)
-            .padding(14.dp)
+            .padding(maxSize / 20)
     ) {
         val image = bitmap
         if (image != null) {

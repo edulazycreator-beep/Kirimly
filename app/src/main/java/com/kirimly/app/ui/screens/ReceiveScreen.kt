@@ -129,12 +129,13 @@ fun ReceiveScreen(
                         val url = qrUrl
                         if (url != null) {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                QrCodeImage(content = url)
+                                QrCodeImage(content = url, maxSize = 200.dp)
                             }
                         }
                         Text(
                             tr(R.string.u_from_apple_steps),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -205,10 +206,10 @@ private fun StatusLine(serverState: ServerState, deviceName: String) {
 
 @Composable
 private fun ManualEntry(address: String, pin: String?, onCopy: () -> Unit, onNewPin: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             tr(R.string.u_type_in_safari),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         // Address: high-contrast inverse plate so it reads at a glance from another device.
@@ -217,15 +218,16 @@ private fun ManualEntry(address: String, pin: String?, onCopy: () -> Unit, onNew
             color = MaterialTheme.colorScheme.inverseSurface,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp, end = 0.dp)) {
+                // Safari adds http:// itself, so the shorter form always fits on one line.
                 Text(
-                    "http://$address",
-                    style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                    address,
+                    style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                     color = MaterialTheme.colorScheme.inverseOnSurface,
-                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(vertical = 14.dp)
+                        .padding(vertical = 10.dp)
                 )
                 IconButton(onClick = onCopy) {
                     Icon(
@@ -239,18 +241,18 @@ private fun ManualEntry(address: String, pin: String?, onCopy: () -> Unit, onNew
         if (pin != null) {
             Text(
                 tr(R.string.u_then_enter_code),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 pin.forEach { digit ->
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(width = 52.dp, height = 64.dp)
-                            .border(BorderStroke(2.dp, MaterialTheme.colorScheme.primary), RectangleShape)
+                            .size(width = 40.dp, height = 48.dp)
+                            .border(BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary), RectangleShape)
                     ) {
-                        Text(digit.toString(), style = MonoDigits.copy(fontSize = 30.sp, letterSpacing = 0.sp))
+                        Text(digit.toString(), style = MonoDigits.copy(fontSize = 22.sp, letterSpacing = 0.sp))
                     }
                 }
                 Spacer(Modifier.weight(1f))
