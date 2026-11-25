@@ -1,5 +1,7 @@
 package com.kirimly.app.network
 
+import com.kirimly.app.util.tr
+import com.kirimly.app.R
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -384,7 +386,10 @@ class KirimlyServerManager(
         routing {
             get("/") {
                 call.response.header(HttpHeaders.CacheControl, "no-store")
-                call.respondText(IosWebPortalHtml.PAGE, ContentType.Text.Html.withCharset(Charsets.UTF_8))
+                call.respondText(
+                    IosWebPortalHtml.render(tr(R.string.u_lang_code)),
+                    ContentType.Text.Html.withCharset(Charsets.UTF_8)
+                )
             }
 
             get("/assets/host-grotesk.woff2") {

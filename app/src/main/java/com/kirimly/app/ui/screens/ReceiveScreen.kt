@@ -1,5 +1,11 @@
 package com.kirimly.app.ui.screens
 
+import com.kirimly.app.ui.theme.MonoDigits
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -199,19 +205,55 @@ private fun StatusLine(serverState: ServerState, deviceName: String) {
 
 @Composable
 private fun ManualEntry(address: String, pin: String?, onCopy: () -> Unit, onNewPin: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            tr(R.string.u_manual_title),
-            style = MaterialTheme.typography.labelMedium,
+            tr(R.string.u_type_in_safari),
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("http://$address", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            IconButton(onClick = onCopy) { Icon(Icons.Rounded.ContentCopy, contentDescription = tr(R.string.u_copy_address)) }
+        // Address: high-contrast inverse plate so it reads at a glance from another device.
+        Surface(
+            shape = RectangleShape,
+            color = MaterialTheme.colorScheme.inverseSurface,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 4.dp)) {
+                Text(
+                    "http://$address",
+                    style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 14.dp)
+                )
+                IconButton(onClick = onCopy) {
+                    Icon(
+                        Icons.Rounded.ContentCopy,
+                        contentDescription = tr(R.string.u_copy_address),
+                        tint = MaterialTheme.colorScheme.inverseOnSurface
+                    )
+                }
+            }
         }
         if (pin != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(tr(R.string.u_code_label, pin), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(
+                tr(R.string.u_then_enter_code),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pin.forEach { digit ->
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(width = 52.dp, height = 64.dp)
+                            .border(BorderStroke(2.dp, MaterialTheme.colorScheme.primary), RectangleShape)
+                    ) {
+                        Text(digit.toString(), style = MonoDigits.copy(fontSize = 30.sp, letterSpacing = 0.sp))
+                    }
+                }
+                Spacer(Modifier.weight(1f))
                 IconButton(onClick = onNewPin) { Icon(Icons.Rounded.Refresh, contentDescription = tr(R.string.u_new_code)) }
             }
         }

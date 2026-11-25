@@ -8,7 +8,13 @@ package com.kirimly.app.network
  */
 object IosWebPortalHtml {
 
-    const val PAGE: String = """<!DOCTYPE html>
+    val PAGE: String get() = HEAD + SCRIPT
+
+    /** The page in the app's current language ("id" or "en"), so Safari matches the app. */
+    fun render(lang: String): String = PAGE.replaceFirst("<html lang=\"id\">", "<html lang=\"" + lang + "\">")
+
+    /** Markup and styles. */
+    private const val HEAD: String = """<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="utf-8">
@@ -165,6 +171,11 @@ textarea:focus, input.field:focus { border-color: var(--text); }
 .label { font-size: 13px; color: var(--muted); margin: 0 0 8px; display: block; }
 .footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--hairline); }
 #folderInput { display: none; }
+.tabs { display: flex; gap: 4px; padding: 4px; margin-top: 8px; border: 1px solid var(--hairline); border-radius: 9999px; background: var(--surface); position: sticky; top: 8px; z-index: 5; }
+.tab { flex: 1; appearance: none; border: none; border-radius: 9999px; padding: 12px 6px; font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap; display: flex; align-items: center; justify-content: center; background: transparent; color: var(--muted); cursor: pointer; }
+.tab.active { background: var(--action); color: var(--on-action); }
+.badge { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; flex: none; border-radius: 9999px; background: var(--status); color: #040404; font-size: 12px; line-height: 20px; }
+[hidden] { display: none !important; }
 .ico img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ico { overflow: hidden; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -190,10 +201,16 @@ a.btn { text-align: center; text-decoration: none; display: block; }
 
 <main class="wrap">
   <section class="intro">
-    <h2>Kirim file ke Android, langsung dari Safari.</h2>
-    <p>Tanpa aplikasi, tanpa internet. Cukup satu jaringan Wi-Fi atau hotspot.</p>
+    <h2 id="introTitle">Kirim file ke Android, langsung dari Safari.</h2>
+    <p id="introSub">Tanpa aplikasi, tanpa internet. Cukup satu jaringan Wi-Fi atau hotspot.</p>
   </section>
 
+  <div class="tabs" role="tablist" aria-label="Mode">
+    <button id="tabSend" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="paneSend">Kirim ke Android</button>
+    <button id="tabReceive" class="tab" type="button" role="tab" aria-selected="false" aria-controls="paneReceive">Terima dari Android <span id="sharedBadge" class="badge" style="display:none"></span></button>
+  </div>
+
+  <div id="paneSend" role="tabpanel" aria-labelledby="tabSend">
   <section class="card">
     <h2>Kirim file ke Android</h2>
     <p class="sub">Foto, video, dokumen, arsip, atau satu folder utuh. Di Mac kamu juga bisa menempel gambar dengan Cmd+V.</p>
@@ -228,6 +245,15 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   </section>
 
   <section class="card">
+    <label class="label" for="senderName">Nama perangkatmu (opsional)</label>
+    <input id="senderName" class="field" type="text" maxlength="40" placeholder="mis. iPhone Rina">
+    <p class="notice">Live Photo terkirim sebagai foto. Foto HEIC dikirim apa adanya; Android bisa mengubahnya ke JPG jika diaktifkan.</p>
+  </section>
+
+  </div>
+
+  <div id="paneReceive" role="tabpanel" aria-labelledby="tabReceive" hidden>
+  <section class="card">
     <div class="card-head">
       <div>
         <h2>Dibagikan dari Android</h2>
@@ -240,24 +266,20 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     <div class="actions" id="zipRow" style="display:none"><a id="zipLink" class="btn" href="#">Unduh semua (ZIP)</a></div>
   </section>
 
-  <section class="card">
-    <label class="label" for="senderName">Nama perangkatmu (opsional)</label>
-    <input id="senderName" class="field" type="text" maxlength="40" placeholder="mis. iPhone Rina">
-    <p class="notice">Live Photo terkirim sebagai foto. Foto HEIC dikirim apa adanya; Android bisa mengubahnya ke JPG jika diaktifkan.</p>
-  </section>
+  </div>
 
   <p class="footer"><span class="dot" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Koneksi lokal tanpa enkripsi (HTTP). Gunakan di jaringan yang kamu percayai.</p>
 </main>
 
 <div id="pinModal" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
   <div class="modal" id="pinCard">
-    <h3 id="pinTitle">Masukkan PIN</h3>
-    <p>Lihat PIN 4 digit di layar Terima pada perangkat Android.</p>
+    <h3 id="pinTitle">Masukkan kode</h3>
+    <p>Lihat kode 4 digit di tab Terima pada aplikasi Kirimly di Android.</p>
     <div class="pin-inputs">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code" aria-label="Digit PIN 1">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit PIN 2">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit PIN 3">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit PIN 4">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code" aria-label="Digit kode 1">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit kode 2">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit kode 3">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit kode 4">
     </div>
     <div id="pinError" class="err-text" role="alert"></div>
     <button id="pinSubmit" class="btn" type="button">Hubungkan</button>
@@ -278,23 +300,36 @@ a.btn { text-align: center; text-decoration: none; display: block; }
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script>
+"""
+
+    /** Behaviour; kept separate so neither constant exceeds the class-file limit. */
+    private const val SCRIPT: String = """<script>
 (function () {
   'use strict';
-  var LANG = (function () {
-    var l = (navigator.language || 'id').toLowerCase();
-    return (l.indexOf('id') === 0 || l.indexOf('in') === 0) ? 'id' : 'en';
-  })();
+  /* The Android app writes its own language into <html lang>, so the page always matches the app. */
+  var LANG = (document.documentElement.getAttribute('lang') || 'id').toLowerCase().indexOf('en') === 0 ? 'en' : 'id';
   var EN = {
+    'Kirim ke Android': 'Send to Android',
+    'Terima dari Android': 'Receive from Android',
+    'Ambil file yang dibagikan dari Android.': 'Get files shared from Android.',
+    'Pilih file di Android, lalu ketuk iPhone ini di daftar tujuan. Atau unduh yang sudah dibagikan di bawah.': 'Choose files on Android, then tap this iPhone in its list of destinations. Or download what\'s already shared below.',
+    'PIN salah atau belum diisi': 'Wrong or missing code',
+    'Terlalu banyak percobaan. Tunggu 30 detik.': 'Too many attempts. Wait 30 seconds.',
+    'Daftar file kosong': 'No files selected',
+    'Permintaan ditolak': 'Request declined',
+    'Waktu persetujuan habis': 'Approval timed out',
+    'Teks kosong': 'The text is empty',
+    'Teks terlalu panjang': 'The text is too long',
+    'Sesi upload tidak valid': 'Upload session is invalid',
     'Android ingin mengirim': 'Android wants to send',
     'Belum ada file yang dibagikan.': 'Nothing shared yet.',
     'Bersihkan': 'Clear',
     'Biarkan layar menyala dan Safari tetap terbuka. Jika koneksi terputus atau layar terkunci, Kirimly melanjutkan dari posisi terakhir saat kamu kembali.': 'Keep the screen on and Safari open. If the connection drops or the screen locks, Kirimly resumes where it stopped when you come back.',
     'Dibagikan dari Android': 'Shared from Android',
-    'Digit PIN 1': 'PIN digit 1',
-    'Digit PIN 2': 'PIN digit 2',
-    'Digit PIN 3': 'PIN digit 3',
-    'Digit PIN 4': 'PIN digit 4',
+    'Digit kode 1': 'Code digit 1',
+    'Digit kode 2': 'Code digit 2',
+    'Digit kode 3': 'Code digit 3',
+    'Digit kode 4': 'Code digit 4',
     'Foto, video, dokumen, arsip, atau satu folder utuh. Di Mac kamu juga bisa menempel gambar dengan Cmd+V.': 'Photos, videos, documents, archives or a whole folder. On a Mac you can also paste images with Cmd+V.',
     'Hubungkan': 'Connect',
     'Ketik atau tempel di sini': 'Type or paste here',
@@ -306,9 +341,9 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     'Kirim teks atau tautan': 'Send text or a link',
     'Koneksi lokal tanpa enkripsi (HTTP). Gunakan di jaringan yang kamu percayai.': 'Local connection without encryption (HTTP). Use it on a network you trust.',
     'Langsung masuk ke clipboard & riwayat Android.': 'Goes straight to the Android clipboard & history.',
-    'Lihat PIN 4 digit di layar Terima pada perangkat Android.': 'Find the 4-digit PIN on the Receive screen of the Android device.',
+    'Lihat kode 4 digit di tab Terima pada aplikasi Kirimly di Android.': 'Find the 4-digit code on the Receive tab of Kirimly on Android.',
     'Live Photo terkirim sebagai foto. Foto HEIC dikirim apa adanya; Android bisa mengubahnya ke JPG jika diaktifkan.': 'Live Photos are sent as photos. HEIC photos are sent as they are; Android can convert them to JPG if enabled.',
-    'Masukkan PIN': 'Enter PIN',
+    'Masukkan kode': 'Enter code',
     'Mengunggah…': 'Uploading…',
     'Menunggu persetujuan di Android…': 'Waiting for approval on Android…',
     'Muat ulang': 'Reload',
@@ -334,9 +369,9 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     'Koneksi terputus.': 'Connection lost.',
     'Mengirim…': 'Sending…',
     'Menunggu persetujuan di ': 'Waiting for approval on ',
-    'PIN berubah atau tidak valid.': 'The PIN changed or is invalid.',
-    'PIN harus 4 digit.': 'The PIN must be 4 digits.',
-    'PIN salah, coba lagi.': 'Wrong PIN, try again.',
+    'Kode berubah. Masukkan kode baru dari tab Terima.': 'The code changed. Enter the new code from the Receive tab.',
+    'Kode harus 4 digit.': 'The code must be 4 digits.',
+    'Kode salah, coba lagi.': 'Wrong code, try again.',
     'Perangkat Web': 'Web device',
     'Permintaan ditolak oleh Android.': 'Android declined the request.',
     'Salin': 'Copy',
@@ -362,7 +397,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     ' selesai': ' done',
     'dan ': 'and '
   };
-  function T(s) { return LANG === 'en' && Object.prototype.hasOwnProperty.call(EN, s) ? EN[s] : s; }
+  function T(s) { if (!s) return s; return LANG === 'en' && Object.prototype.hasOwnProperty.call(EN, s) ? EN[s] : s; }
   function translatePage() {
     if (LANG !== 'en') return;
     document.documentElement.lang = 'en';
@@ -581,13 +616,13 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     state.pin = pin;
     api('POST', '/api/verify-pin').then(function (res) {
       if (res.ok) { storeSet('kirimly_pin', pin); onOk(); }
-      else { state.pin = ''; onFail((res.data && res.data.message) || T('PIN salah, coba lagi.')); }
+      else { state.pin = ''; onFail(T(res.data && res.data.message) || T('Kode salah, coba lagi.')); }
     }).catch(function () { state.pin = ''; onFail(T('Tidak dapat terhubung ke Android.')); });
   }
 
   function submitPin() {
     var pin = pinInputs.map(function (i) { return i.value; }).join('');
-    if (pin.length !== 4) { el('pinError').textContent = T('PIN harus 4 digit.'); return; }
+    if (pin.length !== 4) { el('pinError').textContent = T('Kode harus 4 digit.'); return; }
     verifyPin(pin, function () { hidePin(); afterAuth(); }, function (msg) {
       var card = el('pinCard');
       card.classList.remove('shake');
@@ -638,7 +673,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   function handleUnauthorized() {
     state.pin = '';
     state.authed = false;
-    showPin(T('PIN berubah atau tidak valid.'));
+    showPin(T('Kode berubah. Masukkan kode baru dari tab Terima.'));
   }
 
   /* ---------- Shared from Android ---------- */
@@ -675,6 +710,9 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     var list = el('sharedList');
     list.innerHTML = '';
     el('sharedEmpty').style.display = items.length ? 'none' : 'block';
+    var badge = el('sharedBadge');
+    badge.textContent = String(items.length);
+    badge.style.display = items.length ? 'inline-block' : 'none';
     var zipOk = items.length > 1 && hasFeature('zip');
     el('zipRow').style.display = zipOk ? 'flex' : 'none';
     if (zipOk) el('zipLink').href = '/api/download-all' + authQuery();
@@ -733,6 +771,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   function showOffer(msg) {
     var items = msg.items || [];
     if (!items.length) return;
+    showTab('receive');
     currentOffer = items;
     el('offerTitle').textContent = (msg.message || 'Android') + T(' ingin mengirim');
     var total = items.reduce(function (a, it) { return a + (it.size > 0 ? it.size : 0); }, 0);
@@ -1009,7 +1048,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
 
   function jsonPost(path, body) {
     return api('POST', path, body).then(function (res) {
-      if (!res.ok) { var err = new Error((res.data && res.data.message) || ('HTTP ' + res.status)); err.status = res.status; throw err; }
+      if (!res.ok) { var err = new Error(T(res.data && res.data.message) || ('HTTP ' + res.status)); err.status = res.status; throw err; }
       return res.data;
     });
   }
@@ -1116,7 +1155,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       if (res.status === 401) { setBusy(false); handleUnauthorized(); return; }
       if (res.status === 403) { setBusy(false); toast(T('Permintaan ditolak oleh Android.'), 'err'); return; }
       if (res.status === 408) { setBusy(false); toast(T('Tidak ada respons. Coba lagi.'), 'err'); return; }
-      if (!res.ok || !res.data.token) { setBusy(false); toast((res.data && res.data.message) || T('Gagal memulai transfer.'), 'err'); return; }
+      if (!res.ok || !res.data.token) { setBusy(false); toast(T(res.data && res.data.message) || T('Gagal memulai transfer.'), 'err'); return; }
       uploadAll(entries, res.data.token);
     }).catch(function () {
       showApproval(false);
@@ -1197,12 +1236,34 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       btn.disabled = false;
       if (res.status === 401) { handleUnauthorized(); return; }
       if (res.ok) { el('textInput').value = ''; toast(T('Teks terkirim & disalin di Android'), 'ok'); }
-      else toast((res.data && res.data.message) || T('Gagal mengirim teks.'), 'err');
+      else toast(T(res.data && res.data.message) || T('Gagal mengirim teks.'), 'err');
     }).catch(function () { btn.disabled = false; toast(T('Koneksi terputus.'), 'err'); });
   });
 
+  /* ---------- Send / Receive tabs ---------- */
+  var INTRO = {
+    send: ['Kirim file ke Android, langsung dari Safari.', 'Tanpa aplikasi, tanpa internet. Cukup satu jaringan Wi-Fi atau hotspot.'],
+    receive: ['Ambil file yang dibagikan dari Android.', 'Pilih file di Android, lalu ketuk iPhone ini di daftar tujuan. Atau unduh yang sudah dibagikan di bawah.']
+  };
+  function showTab(name) {
+    var send = name !== 'receive';
+    el('paneSend').hidden = !send;
+    el('paneReceive').hidden = send;
+    el('tabSend').className = 'tab' + (send ? ' active' : '');
+    el('tabReceive').className = 'tab' + (send ? '' : ' active');
+    el('tabSend').setAttribute('aria-selected', send ? 'true' : 'false');
+    el('tabReceive').setAttribute('aria-selected', send ? 'false' : 'true');
+    var intro = send ? INTRO.send : INTRO.receive;
+    el('introTitle').textContent = T(intro[0]);
+    el('introSub').textContent = T(intro[1]);
+    storeSet('kirimly_tab', send ? 'send' : 'receive');
+  }
+  el('tabSend').addEventListener('click', function () { showTab('send'); });
+  el('tabReceive').addEventListener('click', function () { showTab('receive'); loadShared(); });
+
   /* ---------- Boot ---------- */
   translatePage();
+  showTab(storeGet('kirimly_tab') === 'receive' ? 'receive' : 'send');
   state.deviceId = storeGet('kirimly_device') || '';
   if (!state.deviceId) { state.deviceId = makeDeviceId(); storeSet('kirimly_device', state.deviceId); }
   var savedName = storeGet('kirimly_sender');

@@ -379,4 +379,7 @@
     <string name="u_text_label">Text or link</string>
     <string name="u_transfers">In progress</string>
     <string name="u_tutorial">Show tutorial</string>
+    <string name="u_lang_code" translatable="false">en</string>
+    <string name="u_type_in_safari">Can\'t scan? Type this address in Safari</string>
+    <string name="u_then_enter_code">then enter this code</string>
 </resources>

@@ -379,4 +379,7 @@
     <string name="u_text_label">Teks atau tautan</string>
     <string name="u_transfers">Sedang berjalan</string>
     <string name="u_tutorial">Lihat tutorial</string>
+    <string name="u_lang_code" translatable="false">id</string>
+    <string name="u_type_in_safari">Tidak bisa memindai? Ketik alamat ini di Safari</string>
+    <string name="u_then_enter_code">lalu masukkan kode ini</string>
 </resources>
