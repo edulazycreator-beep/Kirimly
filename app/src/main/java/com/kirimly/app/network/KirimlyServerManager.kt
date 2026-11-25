@@ -44,6 +44,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.streams.asStream
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
@@ -88,7 +89,7 @@ sealed interface ServerEvent {
  * approval suspension and the shared-file catalogue exposed to remote clients.
  */
 class KirimlyServerManager(
-    private val context: Context,
+    private val appContext: Context,
     private val dao: TransferDao,
     private val tracker: TransferTracker,
     private val scope: CoroutineScope
@@ -383,7 +384,7 @@ class KirimlyServerManager(
                                     mimeType = mime,
                                     expectedSize = expected?.sizeBytes ?: -1L,
                                     peerName = peerName,
-                                    streamProvider = part.streamProvider
+                                    streamProvider = { part.provider().asStream() }
                                 )
                                 if (result == null) saved += name else failure = result
                             }
@@ -429,7 +430,7 @@ class KirimlyServerManager(
                 val from = body?.deviceName?.trim()?.take(40)?.ifBlank { null } ?: describeUserAgent(userAgent)
                 withContext(Dispatchers.Main) {
                     try {
-                        val clipboard = context.getSystemService(ClipboardManager::class.java)
+                        val clipboard = appContext.getSystemService(ClipboardManager::class.java)
                         clipboard?.setPrimaryClip(ClipData.newPlainText("Kirimly", text))
                     } catch (_: Exception) {
                     }
@@ -494,7 +495,7 @@ class KirimlyServerManager(
                         call.response.header(HttpHeaders.CacheControl, "no-store")
                         call.respond(
                             UriStreamContent(
-                                context = context,
+                                context = appContext,
                                 uri = item.uri,
                                 contentType = contentType,
                                 contentLength = item.sizeBytes.takeIf { it >= 0L },
@@ -563,7 +564,7 @@ class KirimlyServerManager(
         return try {
             val savedFile = withContext(Dispatchers.IO) {
                 streamProvider().use { input ->
-                    MediaStoreWriter.saveToDownloads(context, fileName, mimeType, input) { bytes ->
+                    MediaStoreWriter.saveToDownloads(appContext, fileName, mimeType, input) { bytes ->
                         tracker.update(trackId, bytes)
                     }
                 }
