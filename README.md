@@ -52,3 +52,13 @@ ui/        Theme (5 palet × terang/gelap), komponen, MainViewModel, layar Kirim
 - CI GitHub Actions lulus (`assembleDebug`); APK debug tersedia sebagai artefak `kirimly-debug-apk`.
 - Release build memakai R8 tetapi belum dikonfigurasi signing — tambahkan `signingConfigs` sendiri.
 - Portal web memakai HTTP biasa di jaringan lokal; `navigator.clipboard` di Safari memakai fallback `execCommand`.
+
+## Tambahan v1.2
+
+- **Nearby Connections**: Android ↔ Android tanpa jaringan bersama (Bluetooth LE → Wi-Fi Direct), kode verifikasi di kedua layar.
+- **iPhone**: hotspot lokal otomatis saat tanpa Wi-Fi, alur dua pindaian (QR Wi-Fi lalu QR Safari), atau Android bergabung ke Personal Hotspot iPhone.
+- **Tahan aplikasi tertutup**: sesi upload & token disimpan di Room (`upload_sessions`, `approved_tokens`), digest dibangun ulang dari file saat server hidup lagi.
+- **Kirim ke Safari**: tab Safari yang terhubung muncul di tab Kirim; Android bisa mendorong antrean, Safari menampilkan prompt Unduh.
+- **Lainnya**: thumbnail (`/api/thumbnail/{id}`), auto-stop saat menganggur, log crash lokal, versionCode dari CI.
+- **Bahasa**: English (default) + Indonesia (`values-in`), pemilih bahasa per aplikasi Android 13+, portal mengikuti bahasa browser.
+- **Play Store**: lihat `docs/` (kebijakan privasi, listing, data safety, izin, checklist).
