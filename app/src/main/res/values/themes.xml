@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Kirimly" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Kirimly" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/kirimly_window_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- Splash: black ground, animated paper-plane mark, then hands over to Theme.Kirimly. -->
+    <style name="Theme.Kirimly.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/kirimly_ground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash_icon</item>
+        <item name="windowSplashScreenAnimationDuration">900</item>
+        <item name="postSplashScreenTheme">@style/Theme.Kirimly</item>
     </style>
 </resources>

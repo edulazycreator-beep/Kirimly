@@ -1,6 +1,23 @@
 package com.kirimly.app.ui
 
 import android.Manifest
+import android.app.Activity
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import com.kirimly.app.data.model.ServerState
+import com.kirimly.app.ui.components.AnimatedKirimlyMark
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -126,6 +143,13 @@ fun KirimlyApp(viewModel: MainViewModel) {
     }
 
     val runningTransfers = activeTransfers.count { !it.isFinished }
+    val serverState by viewModel.serverState.collectAsStateWithLifecycle()
+    var showExitDialog by rememberSaveable { mutableStateOf(false) }
+
+    // Back on the start tab asks before leaving; other tabs pop back to Kirim first.
+    BackHandler(enabled = currentRoute == MainViewModel.ROUTE_SEND && !showSettings) {
+        showExitDialog = true
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -154,9 +178,10 @@ fun KirimlyApp(viewModel: MainViewModel) {
                                     Badge { Text("${runningTransfers + pendingRequests.size}") }
                                 }
                             }) {
-                                Icon(
-                                    imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                                    contentDescription = null
+                                AnimatedNavIcon(
+                                    selected = selected,
+                                    selectedIcon = destination.selectedIcon,
+                                    unselectedIcon = destination.unselectedIcon
                                 )
                             }
                         },
@@ -200,6 +225,20 @@ fun KirimlyApp(viewModel: MainViewModel) {
         )
     }
 
+    // ---- Exit confirmation ----
+    if (showExitDialog) {
+        ExitConfirmDialog(
+            serverRunning = serverState is ServerState.Running || serverState == ServerState.Starting,
+            activeTransfers = runningTransfers,
+            onDismiss = { showExitDialog = false },
+            onExit = { stopServer ->
+                showExitDialog = false
+                if (stopServer) viewModel.stopServer()
+                (context as? Activity)?.finish()
+            }
+        )
+    }
+
     // ---- Theme & palette customiser ----
     if (showSettings) {
         val systemDark = isSystemInDarkTheme()
@@ -215,7 +254,78 @@ fun KirimlyApp(viewModel: MainViewModel) {
             onPaletteChange = viewModel::setPalette,
             onNicknameChange = viewModel::setNickname,
             onPinRequiredChange = viewModel::setPinRequired,
+            onShowTutorial = {
+                showSettings = false
+                viewModel.replayOnboarding()
+            },
             onDismiss = { showSettings = false }
         )
     }
+}
+
+@Composable
+private fun AnimatedNavIcon(selected: Boolean, selectedIcon: ImageVector, unselectedIcon: ImageVector) {
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.12f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "navIconScale"
+    )
+    val lift by animateFloatAsState(
+        targetValue = if (selected) -2f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "navIconLift"
+    )
+    Crossfade(
+        targetState = selected,
+        label = "navIconSwap",
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+            translationY = lift * density
+        }
+    ) { isSelected ->
+        Icon(imageVector = if (isSelected) selectedIcon else unselectedIcon, contentDescription = null)
+    }
+}
+
+@Composable
+private fun ExitConfirmDialog(
+    serverRunning: Boolean,
+    activeTransfers: Int,
+    onDismiss: () -> Unit,
+    onExit: (stopServer: Boolean) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RectangleShape,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        icon = { AnimatedKirimlyMark(modifier = Modifier.size(56.dp), floating = false) },
+        title = { Text("Keluar dari Kirimly?") },
+        text = {
+            Text(
+                text = when {
+                    activeTransfers > 0 ->
+                        "Masih ada $activeTransfers transfer berjalan. Server tetap aktif di latar belakang jika kamu keluar tanpa mematikannya."
+                    serverRunning ->
+                        "Server masih aktif. Kamu bisa membiarkannya berjalan di latar belakang agar perangkat lain tetap bisa mengirim file."
+                    else -> "Kamu bisa membuka Kirimly lagi kapan saja."
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            if (serverRunning) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onExit(true) }) { Text("Matikan server & keluar") }
+                    OutlinedButton(onClick = { onExit(false) }) { Text("Keluar, biarkan aktif") }
+                    TextButton(onClick = onDismiss) { Text("Batal") }
+                }
+            } else {
+                Button(onClick = { onExit(false) }) { Text("Keluar") }
+            }
+        },
+        dismissButton = if (serverRunning) null else @Composable {
+            TextButton(onClick = onDismiss) { Text("Batal") }
+        }
+    )
 }

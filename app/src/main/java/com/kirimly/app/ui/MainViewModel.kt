@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -53,7 +54,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val serverManager = container.serverManager
     private val dao = container.database.transferDao()
 
-    val preferences: StateFlow<UserPreferences> = container.preferences.preferencesFlow
+    /** Null until DataStore has delivered its first value; the splash screen waits on this. */
+    val loadedPreferences: StateFlow<UserPreferences?> = container.preferences.preferencesFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val preferences: StateFlow<UserPreferences> = loadedPreferences
+        .filterNotNull()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UserPreferencesRepository.DEFAULT)
 
     val serverState: StateFlow<ServerState> = serverManager.serverState
@@ -382,6 +388,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setNickname(nickname: String) {
         viewModelScope.launch { container.preferences.setDeviceNickname(nickname) }
         _messages.trySend("Nama perangkat disimpan")
+    }
+
+    fun completeOnboarding() {
+        viewModelScope.launch { container.preferences.setOnboardingCompleted(true) }
+    }
+
+    fun replayOnboarding() {
+        viewModelScope.launch { container.preferences.setOnboardingCompleted(false) }
     }
 
     fun dismissTransfer(id: String) {

@@ -25,11 +25,13 @@ import androidx.compose.material.icons.rounded.BrightnessAuto
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -67,6 +69,7 @@ fun PalettePickerSheet(
     onPaletteChange: (AppPalette) -> Unit,
     onNicknameChange: (String) -> Unit,
     onPinRequiredChange: (Boolean) -> Unit,
+    onShowTutorial: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -171,6 +174,11 @@ fun PalettePickerSheet(
                     Spacer(Modifier.size(12.dp))
                     Switch(checked = preferences.pinRequired, onCheckedChange = onPinRequiredChange)
                 }
+            }
+            OutlinedButton(onClick = onShowTutorial, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.School, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text("Lihat tutorial lagi")
             }
             Spacer(Modifier.height(4.dp))
         }

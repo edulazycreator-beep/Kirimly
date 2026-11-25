@@ -29,6 +29,7 @@ class UserPreferencesRepository(context: Context) {
         val PALETTE = stringPreferencesKey("palette")
         val NICKNAME = stringPreferencesKey("device_nickname")
         val PIN_REQUIRED = booleanPreferencesKey("pin_required")
+        val ONBOARDING_DONE = booleanPreferencesKey("onboarding_completed")
     }
 
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
@@ -40,7 +41,8 @@ class UserPreferencesRepository(context: Context) {
                 themeMode = ThemeMode.fromName(prefs[Keys.THEME_MODE]),
                 palette = AppPalette.fromName(prefs[Keys.PALETTE]),
                 deviceNickname = prefs[Keys.NICKNAME]?.takeIf { it.isNotBlank() } ?: defaultNickname(),
-                pinRequired = prefs[Keys.PIN_REQUIRED] ?: true
+                pinRequired = prefs[Keys.PIN_REQUIRED] ?: true,
+                onboardingCompleted = prefs[Keys.ONBOARDING_DONE] ?: false
             )
         }
         .distinctUntilChanged()
@@ -64,6 +66,10 @@ class UserPreferencesRepository(context: Context) {
         dataStore.edit { it[Keys.PIN_REQUIRED] = required }
     }
 
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        dataStore.edit { it[Keys.ONBOARDING_DONE] = completed }
+    }
+
     companion object {
         const val MAX_NICKNAME_LENGTH = 32
 
@@ -78,7 +84,8 @@ class UserPreferencesRepository(context: Context) {
             themeMode = ThemeMode.DARK,
             palette = AppPalette.MIDNIGHT_MONO,
             deviceNickname = defaultNickname(),
-            pinRequired = true
+            pinRequired = true,
+            onboardingCompleted = false
         )
     }
 }

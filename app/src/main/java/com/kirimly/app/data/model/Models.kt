@@ -178,5 +178,6 @@ data class UserPreferences(
     val themeMode: ThemeMode,
     val palette: AppPalette,
     val deviceNickname: String,
-    val pinRequired: Boolean
+    val pinRequired: Boolean,
+    val onboardingCompleted: Boolean
 )
