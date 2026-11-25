@@ -281,6 +281,105 @@ a.btn { text-align: center; text-decoration: none; display: block; }
 <script>
 (function () {
   'use strict';
+  var LANG = (function () {
+    var l = (navigator.language || 'id').toLowerCase();
+    return (l.indexOf('id') === 0 || l.indexOf('in') === 0) ? 'id' : 'en';
+  })();
+  var EN = {
+    'Android ingin mengirim': 'Android wants to send',
+    'Belum ada file yang dibagikan.': 'Nothing shared yet.',
+    'Bersihkan': 'Clear',
+    'Biarkan layar menyala dan Safari tetap terbuka. Jika koneksi terputus atau layar terkunci, Kirimly melanjutkan dari posisi terakhir saat kamu kembali.': 'Keep the screen on and Safari open. If the connection drops or the screen locks, Kirimly resumes where it stopped when you come back.',
+    'Dibagikan dari Android': 'Shared from Android',
+    'Digit PIN 1': 'PIN digit 1',
+    'Digit PIN 2': 'PIN digit 2',
+    'Digit PIN 3': 'PIN digit 3',
+    'Digit PIN 4': 'PIN digit 4',
+    'Foto, video, dokumen, arsip, atau satu folder utuh. Di Mac kamu juga bisa menempel gambar dengan Cmd+V.': 'Photos, videos, documents, archives or a whole folder. On a Mac you can also paste images with Cmd+V.',
+    'Hubungkan': 'Connect',
+    'Ketik atau tempel di sini': 'Type or paste here',
+    'Ketuk untuk mengunduh.': 'Tap to download.',
+    'Kirim': 'Send',
+    'Kirim Teks': 'Send text',
+    'Kirim file ke Android': 'Send files to Android',
+    'Kirim file ke Android, langsung dari Safari.': 'Send files to Android, straight from Safari.',
+    'Kirim teks atau tautan': 'Send text or a link',
+    'Koneksi lokal tanpa enkripsi (HTTP). Gunakan di jaringan yang kamu percayai.': 'Local connection without encryption (HTTP). Use it on a network you trust.',
+    'Langsung masuk ke clipboard & riwayat Android.': 'Goes straight to the Android clipboard & history.',
+    'Lihat PIN 4 digit di layar Terima pada perangkat Android.': 'Find the 4-digit PIN on the Receive screen of the Android device.',
+    'Live Photo terkirim sebagai foto. Foto HEIC dikirim apa adanya; Android bisa mengubahnya ke JPG jika diaktifkan.': 'Live Photos are sent as photos. HEIC photos are sent as they are; Android can convert them to JPG if enabled.',
+    'Masukkan PIN': 'Enter PIN',
+    'Mengunggah…': 'Uploading…',
+    'Menunggu persetujuan di Android…': 'Waiting for approval on Android…',
+    'Muat ulang': 'Reload',
+    'Nama perangkatmu (opsional)': 'Your device name (optional)',
+    'Pilih file': 'Choose files',
+    'Pilih folder': 'Choose folder',
+    'Tanpa aplikasi, tanpa internet. Cukup satu jaringan Wi-Fi atau hotspot.': 'No app, no internet. Just one Wi-Fi network or hotspot.',
+    'Teks atau URL': 'Text or URL',
+    'Tolak': 'Decline',
+    'Unduh': 'Download',
+    'Unduh semua (ZIP)': 'Download all (ZIP)',
+    'atau seret & lepas di sini': 'or drag & drop here',
+    'mis. iPhone Rina': 'e.g. Rina\'s iPhone',
+    ' item • ': ' items • ',
+    '. Pindai ulang QR jika halaman berhenti merespons.': '. Rescan the QR if the page stops responding.',
+    'Alamat Android berubah ke ': 'Android\'s address changed to ',
+    'Berhasil dikirim!': 'Sent!',
+    'Gagal memuat daftar file.': 'Couldn\'t load the file list.',
+    'Gagal memulai transfer.': 'Couldn\'t start the transfer.',
+    'Gagal mengirim teks.': 'Couldn\'t send the text.',
+    'Gagal: ': 'Failed: ',
+    'Hapus ': 'Remove ',
+    'Koneksi terputus.': 'Connection lost.',
+    'Mengirim…': 'Sending…',
+    'Menunggu persetujuan di ': 'Waiting for approval on ',
+    'PIN berubah atau tidak valid.': 'The PIN changed or is invalid.',
+    'PIN harus 4 digit.': 'The PIN must be 4 digits.',
+    'PIN salah, coba lagi.': 'Wrong PIN, try again.',
+    'Perangkat Web': 'Web device',
+    'Permintaan ditolak oleh Android.': 'Android declined the request.',
+    'Salin': 'Copy',
+    'Salin manual: tekan lama teksnya': 'Copy manually: long-press the text',
+    'Salin teks': 'Copy text',
+    'Sebagian file gagal dikirim.': 'Some files failed to send.',
+    'Semua file terkirim': 'All files sent',
+    'Server Android dihentikan.': 'The Android server stopped.',
+    'Sesi upload kedaluwarsa': 'Upload session expired',
+    'Teks disalin': 'Text copied',
+    'Teks masih kosong.': 'The text is empty.',
+    'Teks terkirim & disalin di Android': 'Text sent & copied on Android',
+    'Tidak ada respons. Coba lagi.': 'No response. Try again.',
+    'Tidak dapat terhubung ke Android.': 'Can\'t connect to Android.',
+    'Tidak dapat terhubung ke Android. Pastikan server aktif.': 'Can\'t connect to Android. Make sure the server is running.',
+    'Total ': 'Total ',
+    ' dari ': ' of ',
+    ' file ditempel': ' files pasted',
+    ' file terkirim': ' files sent',
+    ' file': ' files',
+    ' ingin mengirim': ' wants to send',
+    ' lainnya': ' more',
+    ' selesai': ' done',
+    'dan ': 'and '
+  };
+  function T(s) { return LANG === 'en' && Object.prototype.hasOwnProperty.call(EN, s) ? EN[s] : s; }
+  function translatePage() {
+    if (LANG !== 'en') return;
+    document.documentElement.lang = 'en';
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    var node;
+    while ((node = walker.nextNode())) {
+      var raw = node.nodeValue, t = raw.trim();
+      if (t && Object.prototype.hasOwnProperty.call(EN, t)) node.nodeValue = raw.replace(t, EN[t]);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[placeholder],[aria-label]'), function (n) {
+      ['placeholder', 'aria-label'].forEach(function (a) {
+        var v = n.getAttribute(a);
+        if (v && Object.prototype.hasOwnProperty.call(EN, v)) n.setAttribute(a, EN[v]);
+      });
+    });
+  }
+
 
   function Sha256() {
     this.h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
@@ -393,7 +492,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     if (/Macintosh/.test(ua)) return 'Mac';
     if (/Android/.test(ua)) return 'Android';
     if (/Windows/.test(ua)) return 'Windows PC';
-    return 'Perangkat Web';
+    return T('Perangkat Web');
   }
 
   function senderName() {
@@ -477,13 +576,13 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     state.pin = pin;
     api('POST', '/api/verify-pin').then(function (res) {
       if (res.ok) { storeSet('kirimly_pin', pin); onOk(); }
-      else { state.pin = ''; onFail((res.data && res.data.message) || 'PIN salah, coba lagi.'); }
-    }).catch(function () { state.pin = ''; onFail('Tidak dapat terhubung ke Android.'); });
+      else { state.pin = ''; onFail((res.data && res.data.message) || T('PIN salah, coba lagi.')); }
+    }).catch(function () { state.pin = ''; onFail(T('Tidak dapat terhubung ke Android.')); });
   }
 
   function submitPin() {
     var pin = pinInputs.map(function (i) { return i.value; }).join('');
-    if (pin.length !== 4) { el('pinError').textContent = 'PIN harus 4 digit.'; return; }
+    if (pin.length !== 4) { el('pinError').textContent = T('PIN harus 4 digit.'); return; }
     verifyPin(pin, function () { hidePin(); afterAuth(); }, function (msg) {
       var card = el('pinCard');
       card.classList.remove('shake');
@@ -520,7 +619,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
         showPin();
       }
     }).catch(function () {
-      toast('Tidak dapat terhubung ke Android. Pastikan server aktif.', 'err');
+      toast(T('Tidak dapat terhubung ke Android. Pastikan server aktif.'), 'err');
       setTimeout(loadInfo, 4000);
     });
   }
@@ -534,7 +633,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   function handleUnauthorized() {
     state.pin = '';
     state.authed = false;
-    showPin('PIN berubah atau tidak valid.');
+    showPin(T('PIN berubah atau tidak valid.'));
   }
 
   /* ---------- Shared from Android ---------- */
@@ -542,7 +641,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     api('GET', '/api/shared-files').then(function (res) {
       if (res.status === 401) { handleUnauthorized(); return; }
       renderShared((res.data && res.data.items) || []);
-    }).catch(function () { toast('Gagal memuat daftar file.', 'err'); });
+    }).catch(function () { toast(T('Gagal memuat daftar file.'), 'err'); });
   }
 
   function copyText(text) {
@@ -558,10 +657,10 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       var ok = false;
       try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
       document.body.removeChild(ta);
-      toast(ok ? 'Teks disalin' : 'Salin manual: tekan lama teksnya', ok ? 'ok' : 'err');
+      toast(ok ? T('Teks disalin') : T('Salin manual: tekan lama teksnya'), ok ? 'ok' : 'err');
     }
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).then(function () { toast('Teks disalin', 'ok'); }, fallback);
+      navigator.clipboard.writeText(text).then(function () { toast(T('Teks disalin'), 'ok'); }, fallback);
     } else {
       fallback();
     }
@@ -597,7 +696,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
         var btn = document.createElement('button');
         btn.className = 'btn small ghost';
         btn.type = 'button';
-        btn.textContent = 'Salin';
+        btn.textContent = T('Salin');
         btn.addEventListener('click', function () { copyText(item.text || ''); });
         li.appendChild(ico); li.appendChild(meta); li.appendChild(btn);
       } else {
@@ -610,7 +709,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
         meta.appendChild(nm); meta.appendChild(sz);
         var a = document.createElement('a');
         a.className = 'btn small';
-        a.textContent = 'Unduh';
+        a.textContent = T('Unduh');
         a.href = '/api/download/' + encodeURIComponent(item.id) + authQuery();
         a.setAttribute('download', item.name);
         li.appendChild(ico); li.appendChild(meta); li.appendChild(a);
@@ -630,9 +729,9 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     var items = msg.items || [];
     if (!items.length) return;
     currentOffer = items;
-    el('offerTitle').textContent = (msg.message || 'Android') + ' ingin mengirim';
+    el('offerTitle').textContent = (msg.message || 'Android') + T(' ingin mengirim');
     var total = items.reduce(function (a, it) { return a + (it.size > 0 ? it.size : 0); }, 0);
-    el('offerSub').textContent = items.length + ' item • ' + fmtSize(total);
+    el('offerSub').textContent = items.length + T(' item • ') + fmtSize(total);
     var list = el('offerList');
     list.innerHTML = '';
     items.slice(0, 6).forEach(function (it) {
@@ -647,11 +746,11 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     if (items.length > 6) {
       var more = document.createElement('li');
       more.className = 'row size';
-      more.textContent = 'dan ' + (items.length - 6) + ' lainnya';
+      more.textContent = T('dan ') + (items.length - 6) + T(' lainnya');
       list.appendChild(more);
     }
     var onlyText = items.length === 1 && items[0].type === 'text';
-    el('offerAccept').textContent = onlyText ? 'Salin teks' : (items.length > 1 ? 'Unduh semua (ZIP)' : 'Unduh');
+    el('offerAccept').textContent = onlyText ? T('Salin teks') : (items.length > 1 ? T('Unduh semua (ZIP)') : T('Unduh'));
     el('offerModal').className = 'modal-back show';
     el('offerAccept').focus();
   }
@@ -697,8 +796,8 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       if (msg.type === 'shared-updated') loadShared();
       if (msg.type === 'offer') showOffer(msg);
       if (msg.type === 'pin-changed' && !(state.info && state.info.trusted)) handleUnauthorized();
-      if (msg.type === 'server-stopping') toast('Server Android dihentikan.', 'err');
-      if (msg.type === 'address-changed') toast('Alamat Android berubah ke ' + msg.message + '. Pindai ulang QR jika halaman berhenti merespons.', 'err');
+      if (msg.type === 'server-stopping') toast(T('Server Android dihentikan.'), 'err');
+      if (msg.type === 'address-changed') toast(T('Alamat Android berubah ke ') + msg.message + T('. Pindai ulang QR jika halaman berhenti merespons.'), 'err');
     };
     ws.onclose = function () { el('wsDot').className = 'dot'; scheduleWs(); };
     ws.onerror = function () { el('wsDot').className = 'dot'; };
@@ -771,7 +870,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       var rm = document.createElement('button');
       rm.className = 'icon-btn';
       rm.type = 'button';
-      rm.setAttribute('aria-label', 'Hapus ' + f.name);
+      rm.setAttribute('aria-label', T('Hapus ') + f.name);
       rm.textContent = '×';
       rm.disabled = state.busy;
       rm.addEventListener('click', function () {
@@ -784,8 +883,8 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     });
     var has = state.files.length > 0;
     el('selectedSummary').style.display = has ? 'flex' : 'none';
-    el('selCount').textContent = state.files.length + ' file';
-    el('selSize').textContent = 'Total ' + fmtSize(total);
+    el('selCount').textContent = state.files.length + T(' file');
+    el('selSize').textContent = T('Total ') + fmtSize(total);
     el('sendBtn').disabled = !has || state.busy;
     el('clearBtn').style.display = has && !state.busy ? 'block' : 'none';
   }
@@ -832,7 +931,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       addEntry(renamed, '');
     }
     renderSelected();
-    toast(files.length + ' file ditempel', 'ok');
+    toast(files.length + T(' file ditempel'), 'ok');
   });
 
   el('clearBtn').addEventListener('click', function () {
@@ -845,7 +944,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   /* ---------- Upload flow ---------- */
   function setBusy(busy) {
     state.busy = busy;
-    el('sendBtn').textContent = busy ? 'Mengirim…' : 'Kirim';
+    el('sendBtn').textContent = busy ? T('Mengirim…') : T('Kirim');
     renderSelected();
   }
 
@@ -926,7 +1025,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       var wait = Math.min(1000 * Math.pow(2, Math.min(retries, 4)), 15000);
       return pause(wait).then(function () {
         return api('GET', '/api/upload/status?id=' + encodeURIComponent(uploadId)).then(function (res) {
-          if (res.status === 404) throw new Error('Sesi upload kedaluwarsa');
+          if (res.status === 404) throw new Error(T('Sesi upload kedaluwarsa'));
           return res.data.offset;
         }, function () { return null; });
       });
@@ -955,7 +1054,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
             return sendFrom(res.data.offset);
           }
           if (res.status === 409) return catchUpHash(res.data.offset).then(function () { return sendFrom(res.data.offset); });
-          if (res.status === 404) throw new Error('Sesi upload kedaluwarsa');
+          if (res.status === 404) throw new Error(T('Sesi upload kedaluwarsa'));
           return retryOr(new Error('HTTP ' + res.status)).then(function (next) { return sendFrom(next === null ? offset : next); });
         }, function (err) {
           return retryOr(err).then(function (next) {
@@ -1003,19 +1102,19 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     if (!state.authed && state.info && state.info.pinRequired && !state.info.trusted) { showPin(); return; }
     var entries = state.files.slice();
     setBusy(true);
-    showApproval(true, 'Menunggu persetujuan di ' + ((state.info && state.info.deviceName) || 'Android') + '…');
+    showApproval(true, T('Menunggu persetujuan di ') + ((state.info && state.info.deviceName) || 'Android') + '…');
     var meta = entries.map(function (en) { return { name: en.file.name, size: en.file.size, mimeType: en.file.type || 'application/octet-stream' }; });
     api('POST', '/api/request-upload', { deviceName: senderName(), deviceId: state.deviceId, files: meta }).then(function (res) {
       showApproval(false);
       if (res.status === 401) { setBusy(false); handleUnauthorized(); return; }
-      if (res.status === 403) { setBusy(false); toast('Permintaan ditolak oleh Android.', 'err'); return; }
-      if (res.status === 408) { setBusy(false); toast('Tidak ada respons. Coba lagi.', 'err'); return; }
-      if (!res.ok || !res.data.token) { setBusy(false); toast((res.data && res.data.message) || 'Gagal memulai transfer.', 'err'); return; }
+      if (res.status === 403) { setBusy(false); toast(T('Permintaan ditolak oleh Android.'), 'err'); return; }
+      if (res.status === 408) { setBusy(false); toast(T('Tidak ada respons. Coba lagi.'), 'err'); return; }
+      if (!res.ok || !res.data.token) { setBusy(false); toast((res.data && res.data.message) || T('Gagal memulai transfer.'), 'err'); return; }
       uploadAll(entries, res.data.token);
     }).catch(function () {
       showApproval(false);
       setBusy(false);
-      toast('Koneksi terputus.', 'err');
+      toast(T('Koneksi terputus.'), 'err');
     });
   });
 
@@ -1033,7 +1132,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       var loaded = progress.reduce(function (a, b) { return a + b; }, 0);
       setBar(el('overallBar'), (loaded / totalBytes) * 100);
       var secs = (Date.now() - started) / 1000;
-      el('overallLabel').textContent = finished + ' dari ' + entries.length + ' selesai';
+      el('overallLabel').textContent = finished + T(' dari ') + entries.length + T(' selesai');
       if (secs > 0.3) el('overallSpeed').textContent = fmtSpeed(loaded / secs) + ' • ' + Math.round((loaded / totalBytes) * 100) + '%';
     }
 
@@ -1055,7 +1154,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
           failures++;
           setBar(bar, 100, 'fail');
           var sz = el('size-' + i);
-          if (sz) sz.textContent = 'Gagal: ' + (err && err.message ? err.message : 'koneksi');
+          if (sz) sz.textContent = T('Gagal: ') + (err && err.message ? err.message : 'koneksi');
         }).then(function () {
           finished++;
           refreshOverall();
@@ -1067,10 +1166,10 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       Promise.all(pool).then(resolveAll);
     }).then(function () {
       setBar(el('overallBar'), 100, failures ? 'fail' : 'done');
-      el('overallLabel').textContent = failures ? (entries.length - failures) + ' dari ' + entries.length + ' file terkirim' : 'Semua file terkirim';
+      el('overallLabel').textContent = failures ? (entries.length - failures) + T(' dari ') + entries.length + T(' file terkirim') : T('Semua file terkirim');
       el('overallSpeed').textContent = '';
       el('keepAwake').style.display = 'none';
-      toast(failures ? 'Sebagian file gagal dikirim.' : 'Berhasil dikirim!', failures ? 'err' : 'ok');
+      toast(failures ? T('Sebagian file gagal dikirim.') : T('Berhasil dikirim!'), failures ? 'err' : 'ok');
       state.files = [];
       setBusy(false);
     });
@@ -1083,19 +1182,20 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   /* ---------- Text ---------- */
   el('sendTextBtn').addEventListener('click', function () {
     var text = el('textInput').value;
-    if (!text.trim()) { toast('Teks masih kosong.', 'err'); return; }
+    if (!text.trim()) { toast(T('Teks masih kosong.'), 'err'); return; }
     if (!state.authed && state.info && state.info.pinRequired && !state.info.trusted) { showPin(); return; }
     var btn = el('sendTextBtn');
     btn.disabled = true;
     api('POST', '/api/text', { text: text, deviceName: senderName(), deviceId: state.deviceId }).then(function (res) {
       btn.disabled = false;
       if (res.status === 401) { handleUnauthorized(); return; }
-      if (res.ok) { el('textInput').value = ''; toast('Teks terkirim & disalin di Android', 'ok'); }
-      else toast((res.data && res.data.message) || 'Gagal mengirim teks.', 'err');
-    }).catch(function () { btn.disabled = false; toast('Koneksi terputus.', 'err'); });
+      if (res.ok) { el('textInput').value = ''; toast(T('Teks terkirim & disalin di Android'), 'ok'); }
+      else toast((res.data && res.data.message) || T('Gagal mengirim teks.'), 'err');
+    }).catch(function () { btn.disabled = false; toast(T('Koneksi terputus.'), 'err'); });
   });
 
   /* ---------- Boot ---------- */
+  translatePage();
   state.deviceId = storeGet('kirimly_device') || '';
   if (!state.deviceId) { state.deviceId = makeDeviceId(); storeSet('kirimly_device', state.deviceId); }
   var savedName = storeGet('kirimly_sender');
