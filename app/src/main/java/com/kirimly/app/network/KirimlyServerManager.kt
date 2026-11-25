@@ -44,7 +44,8 @@ import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import io.ktor.utils.io.ByteWriteChannel
-import io.ktor.utils.io.jvm.javaio.toInputStream
+import io.ktor.utils.io.core.Input
+import io.ktor.utils.io.core.readAvailable
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
@@ -384,7 +385,7 @@ class KirimlyServerManager(
                                     mimeType = mime,
                                     expectedSize = expected?.sizeBytes ?: -1L,
                                     peerName = peerName,
-                                    streamProvider = { part.provider().toInputStream() }
+                                    streamProvider = { KtorInputStream(part.provider()) }
                                 )
                                 if (result == null) saved += name else failure = result
                             }
@@ -657,6 +658,25 @@ class KirimlyServerManager(
         val ascii = fileName.map { if (it.code in 0x20..0x7E && it != '"' && it != '\\') it else '_' }.joinToString("")
         val encoded = URLEncoder.encode(fileName, "UTF-8").replace("+", "%20")
         return "attachment; filename=\"$ascii\"; filename*=UTF-8''$encoded"
+    }
+
+    /** Adapts a Ktor [Input] (multipart file part) to a blocking [InputStream]. */
+    private class KtorInputStream(private val input: Input) : InputStream() {
+        override fun read(): Int {
+            if (input.endOfInput) return -1
+            return input.readByte().toInt() and 0xFF
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (len == 0) return 0
+            if (input.endOfInput) return -1
+            val read = input.readAvailable(b, off, len)
+            return if (read <= 0) -1 else read
+        }
+
+        override fun close() {
+            input.close()
+        }
     }
 
     /** Streams a content Uri to the client with an 8 KB buffer. */
