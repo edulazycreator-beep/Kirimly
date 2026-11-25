@@ -3,6 +3,9 @@ package com.kirimly.app.ui.screens
 import com.kirimly.app.R
 import com.kirimly.app.util.tr
 import com.kirimly.app.ui.components.FileThumbnail
+import com.kirimly.app.ui.components.ProBadge
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.RectangleShape
@@ -85,8 +88,11 @@ import java.util.Locale
 @Composable
 fun HistoryScreen(
     viewModel: MainViewModel,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenPro: () -> Unit
 ) {
+    val isPro by viewModel.isPro.collectAsStateWithLifecycle()
+    val hiddenCount by viewModel.historyHiddenCount.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val history by viewModel.history.collectAsStateWithLifecycle()
     val query by viewModel.historyQuery.collectAsStateWithLifecycle()
@@ -142,6 +148,30 @@ fun HistoryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "search") {
+                if (!isPro) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
+                            .clickable(onClick = onOpenPro)
+                            .padding(horizontal = 14.dp, vertical = 16.dp)
+                    ) {
+                        Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            tr(R.string.s_cari_nama_file_teks_atau),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp)
+                        )
+                        ProBadge(locked = true)
+                    }
+                    return@item
+                }
                 OutlinedTextField(
                     value = query,
                     onValueChange = viewModel::setHistoryQuery,
@@ -193,6 +223,27 @@ fun HistoryScreen(
                         onShare = { shareItem(context, item, viewModel) },
                         onDelete = { viewModel.deleteHistoryItem(item.id) }
                     )
+                }
+                if (hiddenCount > 0) {
+                    item(key = "hidden") {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
+                                .clickable(onClick = onOpenPro)
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                tr(R.string.p_history_hidden, hiddenCount),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 12.dp)
+                            )
+                            ProBadge(locked = true)
+                        }
+                    }
                 }
             }
         }

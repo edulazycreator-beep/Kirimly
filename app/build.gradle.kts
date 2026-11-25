@@ -118,4 +118,7 @@ dependencies {
 
     // QR
     implementation(libs.zxing.core)
+
+    // Google Play Billing (Kirimly Pro, one-time purchase)
+    implementation(libs.billing.ktx)
 }

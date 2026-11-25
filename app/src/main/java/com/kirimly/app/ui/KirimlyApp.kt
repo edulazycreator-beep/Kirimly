@@ -75,6 +75,7 @@ import com.kirimly.app.R
 import com.kirimly.app.data.model.ThemeMode
 import com.kirimly.app.ui.components.ApprovalBottomSheet
 import com.kirimly.app.ui.components.PalettePickerSheet
+import com.kirimly.app.ui.components.ProSheet
 import com.kirimly.app.ui.screens.HistoryScreen
 import com.kirimly.app.ui.screens.ReceiveScreen
 import com.kirimly.app.ui.screens.SendScreen
@@ -105,6 +106,10 @@ fun KirimlyApp(viewModel: MainViewModel) {
     val pendingRequests by viewModel.pendingRequests.collectAsStateWithLifecycle()
     val activeTransfers by viewModel.activeTransfers.collectAsStateWithLifecycle()
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showPro by rememberSaveable { mutableStateOf(false) }
+    val isPro by viewModel.isPro.collectAsStateWithLifecycle()
+    val proPrice by viewModel.proPrice.collectAsStateWithLifecycle()
+    val proStatus by viewModel.proStatus.collectAsStateWithLifecycle()
     val crashLogCount by viewModel.crashLogCount.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var permissionsAsked by rememberSaveable { mutableStateOf(false) }
@@ -223,6 +228,7 @@ fun KirimlyApp(viewModel: MainViewModel) {
                     SendScreen(
                         viewModel = viewModel,
                         onOpenSettings = { showSettings = true },
+                        onOpenPro = { showPro = true },
                         onOpenReceive = {
                             navController.navigate(MainViewModel.ROUTE_RECEIVE) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -236,7 +242,11 @@ fun KirimlyApp(viewModel: MainViewModel) {
                     ReceiveScreen(viewModel = viewModel, onOpenSettings = { showSettings = true })
                 }
                 composable(MainViewModel.ROUTE_HISTORY) {
-                    HistoryScreen(viewModel = viewModel, onOpenSettings = { showSettings = true })
+                    HistoryScreen(
+                        viewModel = viewModel,
+                        onOpenSettings = { showSettings = true },
+                        onOpenPro = { showPro = true }
+                    )
                 }
             }
         }
@@ -257,7 +267,8 @@ fun KirimlyApp(viewModel: MainViewModel) {
                     }
                 }
             },
-            onDecline = { viewModel.respondToRequest(request.id, false) }
+            onDecline = { viewModel.respondToRequest(request.id, false) },
+            autoAcceptTrusted = isPro
         )
     }
 
@@ -291,6 +302,9 @@ fun KirimlyApp(viewModel: MainViewModel) {
             onPaletteChange = viewModel::setPalette,
             onNicknameChange = viewModel::setNickname,
             onRemoveTrusted = viewModel::removeTrustedDevice,
+            onOpenPro = { showPro = true },
+            onPortalNameChange = viewModel::setPortalName,
+            onClipboardSyncChange = viewModel::setClipboardSync,
             crashLogCount = crashLogCount,
             onShareCrashLogs = {
                 scope.launch {
@@ -312,6 +326,20 @@ fun KirimlyApp(viewModel: MainViewModel) {
                 viewModel.replayOnboarding()
             },
             onDismiss = { showSettings = false }
+        )
+    }
+
+    // ---- Kirimly Pro ----
+    if (showPro) {
+        ProSheet(
+            isPro = isPro,
+            price = proPrice,
+            status = proStatus,
+            debugPro = preferences.debugPro,
+            onBuy = { (context as? Activity)?.let(viewModel::buyPro) },
+            onRestore = viewModel::restorePro,
+            onDebugPro = viewModel::setDebugPro,
+            onDismiss = { showPro = false }
         )
     }
 }

@@ -30,6 +30,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,6 +66,9 @@ fun PalettePickerSheet(
     onPaletteChange: (AppPalette) -> Unit,
     onNicknameChange: (String) -> Unit,
     onRemoveTrusted: (String) -> Unit,
+    onOpenPro: () -> Unit,
+    onPortalNameChange: (String) -> Unit,
+    onClipboardSyncChange: (Boolean) -> Unit,
     crashLogCount: Int,
     onShareCrashLogs: () -> Unit,
     onShowTutorial: () -> Unit,
@@ -72,8 +77,11 @@ fun PalettePickerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val focusManager = LocalFocusManager.current
     var nickname by remember(preferences.deviceNickname) { mutableStateOf(preferences.deviceNickname) }
+    val isPro = preferences.isPro
+    var portalName by remember(preferences.portalName) { mutableStateOf(preferences.portalName) }
     val saveName = {
         if (nickname.isNotBlank() && nickname != preferences.deviceNickname) onNicknameChange(nickname)
+        if (isPro && portalName.trim() != preferences.portalName) onPortalNameChange(portalName)
         focusManager.clearFocus()
     }
 
@@ -94,6 +102,28 @@ fun PalettePickerSheet(
             verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
             Text(tr(R.string.u_settings), style = MaterialTheme.typography.titleLarge)
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
+                    .clickable(onClick = onOpenPro)
+                    .padding(horizontal = 14.dp, vertical = 14.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Kirimly", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.size(8.dp))
+                        ProBadge()
+                    }
+                    Text(
+                        tr(if (isPro) R.string.p_settings_active else R.string.p_settings_cta),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
             Section(tr(R.string.u_device_name)) {
                 OutlinedTextField(
@@ -120,16 +150,64 @@ fun PalettePickerSheet(
                     }
                 }
                 AppPalette.entries.forEach { palette ->
+                    val locked = !isPro && palette != AppPalette.MIDNIGHT_MONO
                     PaletteRow(
                         palette = palette,
-                        selected = preferences.palette == palette,
+                        selected = (if (isPro) preferences.palette else AppPalette.MIDNIGHT_MONO) == palette,
                         dark = isDarkActive,
-                        onClick = { onPaletteChange(palette) }
+                        locked = locked,
+                        onClick = { if (locked) onOpenPro() else onPaletteChange(palette) }
                     )
                 }
             }
 
+            Section(tr(R.string.p_portal_name)) {
+                if (isPro) {
+                    OutlinedTextField(
+                        value = portalName,
+                        onValueChange = { portalName = it.take(UserPreferencesRepository.MAX_NICKNAME_LENGTH) },
+                        singleLine = true,
+                        placeholder = { Text(preferences.deviceNickname) },
+                        leadingIcon = { Icon(Icons.Rounded.Language, contentDescription = null) },
+                        supportingText = { Text(tr(R.string.p_portal_name_hint)) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { saveName() }),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    LockedRow(text = tr(R.string.p_portal_name_hint), onClick = onOpenPro)
+                }
+            }
+
+            Section(tr(R.string.p_clip_title)) {
+                if (isPro) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onClipboardSyncChange(!preferences.clipboardSync) }
+                    ) {
+                        Text(
+                            tr(R.string.p_clip_body),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
+                        )
+                        Switch(checked = preferences.clipboardSync, onCheckedChange = onClipboardSyncChange)
+                    }
+                } else {
+                    LockedRow(text = tr(R.string.p_clip_body), onClick = onOpenPro)
+                }
+            }
+
             Section(tr(R.string.u_remembered)) {
+                Text(
+                    tr(if (isPro) R.string.p_remembered_pro else R.string.p_remembered_free),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 if (preferences.trustedDevices.isEmpty()) {
                     Text(
                         tr(R.string.u_remembered_empty),
@@ -168,7 +246,28 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun PaletteRow(palette: AppPalette, selected: Boolean, dark: Boolean, onClick: () -> Unit) {
+private fun LockedRow(text: String, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp)
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp)
+        )
+        ProBadge(locked = true)
+    }
+}
+
+@Composable
+private fun PaletteRow(palette: AppPalette, selected: Boolean, dark: Boolean, locked: Boolean, onClick: () -> Unit) {
     val scheme = remember(palette, dark) { kirimlyColorScheme(palette, dark) }
     val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     Row(
@@ -195,6 +294,8 @@ private fun PaletteRow(palette: AppPalette, selected: Boolean, dark: Boolean, on
         Text(palette.displayName, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
         if (selected) {
             Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        } else if (locked) {
+            ProBadge(locked = true)
         }
     }
 }

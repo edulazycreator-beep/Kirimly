@@ -40,6 +40,10 @@ class UserPreferencesRepository(context: Context) {
         val DEVICE_ID = stringPreferencesKey("device_id")
         val TRUSTED = stringSetPreferencesKey("trusted_devices")
         val IDLE_STOP = intPreferencesKey("idle_stop_minutes")
+        val PRO_OWNED = booleanPreferencesKey("pro_owned")
+        val DEBUG_PRO = booleanPreferencesKey("debug_pro")
+        val CLIPBOARD_SYNC = booleanPreferencesKey("clipboard_sync")
+        val PORTAL_NAME = stringPreferencesKey("portal_name")
     }
 
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
@@ -58,7 +62,11 @@ class UserPreferencesRepository(context: Context) {
                 convertHeic = prefs[Keys.CONVERT_HEIC] ?: false,
                 deviceId = prefs[Keys.DEVICE_ID].orEmpty(),
                 trustedDevices = decodeTrusted(prefs[Keys.TRUSTED].orEmpty()),
-                idleStopMinutes = prefs[Keys.IDLE_STOP] ?: 15
+                idleStopMinutes = prefs[Keys.IDLE_STOP] ?: 15,
+                proOwned = prefs[Keys.PRO_OWNED] ?: false,
+                debugPro = prefs[Keys.DEBUG_PRO] ?: false,
+                clipboardSync = prefs[Keys.CLIPBOARD_SYNC] ?: false,
+                portalName = prefs[Keys.PORTAL_NAME].orEmpty()
             )
         }
         .distinctUntilChanged()
@@ -118,6 +126,25 @@ class UserPreferencesRepository(context: Context) {
         dataStore.edit { prefs ->
             val updated = decodeTrusted(prefs[Keys.TRUSTED].orEmpty()).filterNot { it.id == id }
             prefs[Keys.TRUSTED] = updated.map(::encodeTrusted).toSet()
+        }
+    }
+
+    suspend fun setProOwned(owned: Boolean) {
+        dataStore.edit { it[Keys.PRO_OWNED] = owned }
+    }
+
+    suspend fun setDebugPro(enabled: Boolean) {
+        dataStore.edit { it[Keys.DEBUG_PRO] = enabled }
+    }
+
+    suspend fun setClipboardSync(enabled: Boolean) {
+        dataStore.edit { it[Keys.CLIPBOARD_SYNC] = enabled }
+    }
+
+    suspend fun setPortalName(name: String) {
+        val clean = name.trim().take(MAX_NICKNAME_LENGTH)
+        dataStore.edit { prefs ->
+            if (clean.isBlank()) prefs.remove(Keys.PORTAL_NAME) else prefs[Keys.PORTAL_NAME] = clean
         }
     }
 

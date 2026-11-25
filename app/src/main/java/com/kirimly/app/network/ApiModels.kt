@@ -52,7 +52,9 @@ data class UploadResponse(
 data class TextBody(
     val text: String = "",
     val deviceName: String = "",
-    val deviceId: String? = null
+    val deviceId: String? = null,
+    /** True when sent by clipboard sync: copied on arrival, kept out of history. */
+    val clipboard: Boolean = false
 )
 
 @Serializable
@@ -83,7 +85,8 @@ data class WsMessage(
     val message: String? = null,
     val fileName: String? = null,
     val progress: Float? = null,
-    val items: List<SharedItemDto>? = null
+    val items: List<SharedItemDto>? = null,
+    val sender: String? = null
 )
 
 /** Persisted form of an approved request (see ApprovedTokenEntity). */

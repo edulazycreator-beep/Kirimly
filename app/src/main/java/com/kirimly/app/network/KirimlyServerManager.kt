@@ -110,6 +110,8 @@ sealed interface ServerEvent {
     data class TrustedAutoAccepted(val request: PendingTransferRequest) : ServerEvent
     data class AddressChanged(val ip: String) : ServerEvent
     data class BrowserOfferResult(val browserName: String, val accepted: Boolean) : ServerEvent
+    /** Clipboard sync from a remembered device: already copied, not stored in history. */
+    data class ClipboardReceived(val text: String, val from: String) : ServerEvent
 }
 
 /**
@@ -157,6 +159,13 @@ class KirimlyServerManager(
 
     @Volatile
     private var deviceName: String = "Android"
+    /** Kirimly Pro unlocks auto-accept for remembered devices and the custom portal name. */
+    @Volatile private var proActive: Boolean = false
+    @Volatile private var portalName: String = ""
+
+    /** Name shown to iPhone / iPad / Mac browsers. */
+    private val portalDisplayName: String
+        get() = portalName.takeIf { proActive && it.isNotBlank() } ?: deviceName
 
     @Volatile
     private var trustedDevices: Map<String, String> = emptyMap()
@@ -231,6 +240,10 @@ class KirimlyServerManager(
         idleStopMinutes = prefs.idleStopMinutes
         ownDeviceId = prefs.deviceId
         trustedDevices = prefs.trustedDevices.associate { it.id to it.name }
+        val nameBefore = portalDisplayName
+        proActive = prefs.isPro
+        portalName = prefs.portalName
+        if (portalDisplayName != nameBefore) broadcast(WsMessage(type = "name-changed", message = portalDisplayName))
     }
 
     fun refreshPin() {
@@ -405,7 +418,7 @@ class KirimlyServerManager(
             get("/api/info") {
                 call.respond(
                     ServerInfoResponse(
-                        deviceName = deviceName,
+                        deviceName = if (call.request.headers[HttpHeaders.UserAgent].orEmpty().startsWith("Kirimly")) deviceName else portalDisplayName,
                         pinRequired = _pinRequired.value,
                         sharedCount = _sharedItems.value.size,
                         features = FEATURES,
@@ -464,7 +477,7 @@ class KirimlyServerManager(
                         }
                     }
                 )
-                val approved: Boolean? = if (isTrusted(claimedDeviceId)) {
+                val approved: Boolean? = if (proActive && isTrusted(claimedDeviceId)) {
                     _events.tryEmit(ServerEvent.TrustedAutoAccepted(request))
                     true
                 } else {
@@ -785,6 +798,8 @@ class KirimlyServerManager(
                 }
                 val userAgent = call.request.headers[HttpHeaders.UserAgent].orEmpty()
                 val from = body?.deviceName?.trim()?.take(40)?.ifBlank { null } ?: describeUserAgent(userAgent)
+                val isClipboardSync = body?.clipboard == true &&
+                    isTrusted(body.deviceId ?: call.request.headers[DEVICE_HEADER])
                 withContext(Dispatchers.Main) {
                     try {
                         val clipboard = appContext.getSystemService(ClipboardManager::class.java)
@@ -792,10 +807,15 @@ class KirimlyServerManager(
                     } catch (_: Exception) {
                     }
                 }
-                withContext(Dispatchers.IO) {
-                    dao.insert(TransferRecordEntity.forText(text, TransferDirection.RECEIVED, from))
+                if (isClipboardSync) {
+                    _events.tryEmit(ServerEvent.ClipboardReceived(text, from))
+                    broadcast(WsMessage(type = "clip", message = text, sender = from))
+                } else {
+                    withContext(Dispatchers.IO) {
+                        dao.insert(TransferRecordEntity.forText(text, TransferDirection.RECEIVED, from))
+                    }
+                    _events.tryEmit(ServerEvent.TextReceived(text, from))
                 }
-                _events.tryEmit(ServerEvent.TextReceived(text, from))
                 call.respond(SimpleResponse(ok = true))
             }
 
@@ -908,7 +928,7 @@ class KirimlyServerManager(
                                     val entryName = uniqueEntryName(
                                         used,
                                         when (item) {
-                                            is SharedFile -> item.displayName
+                                            is SharedFile -> item.relativePath ?: item.displayName
                                             is SharedText -> "teks-${textIndex++}.txt"
                                         }
                                     )
@@ -960,7 +980,7 @@ class KirimlyServerManager(
                     ?: describeUserAgent(call.request.headers[HttpHeaders.UserAgent].orEmpty())
                 browserSessions[browserId] = this
                 _browsers.update { it + ConnectedBrowser(browserId, browserName, call.request.origin.remoteHost, System.currentTimeMillis()) }
-                send(Frame.Text(jsonCodec.encodeToString(WsMessage.serializer(), WsMessage(type = "hello", message = deviceName))))
+                send(Frame.Text(jsonCodec.encodeToString(WsMessage.serializer(), WsMessage(type = "hello", message = portalDisplayName))))
                 val forwarder = launch {
                     wsBroadcast.collect { message -> send(Frame.Text(message)) }
                 }
@@ -1075,7 +1095,7 @@ class KirimlyServerManager(
         val session = browserSessions[browserId] ?: return false
         val items = _sharedItems.value
         if (items.isEmpty()) return false
-        val message = WsMessage(type = "offer", message = deviceName, items = items.map { it.toDto() })
+        val message = WsMessage(type = "offer", message = portalDisplayName, items = items.map { it.toDto() })
         scope.launch {
             try {
                 session.send(Frame.Text(jsonCodec.encodeToString(WsMessage.serializer(), message)))
@@ -1083,6 +1103,13 @@ class KirimlyServerManager(
             }
         }
         return true
+    }
+
+    /** Clipboard sync (Pro): shows the copied text in every open Safari tab with a Copy button. */
+    fun broadcastClipboard(text: String, from: String): Int {
+        val open = browserSessions.size
+        if (open > 0) broadcast(WsMessage(type = "clip", message = text, sender = from))
+        return open
     }
 
     private fun SharedItem.toDto(): SharedItemDto = when (this) {
@@ -1241,7 +1268,7 @@ class KirimlyServerManager(
      * (Nearby Connections). Trusted devices are accepted at once. Returns null on timeout.
      */
     suspend fun requestApproval(request: PendingTransferRequest): Boolean? {
-        if (isTrusted(request.deviceId)) {
+        if (proActive && isTrusted(request.deviceId)) {
             _events.tryEmit(ServerEvent.TrustedAutoAccepted(request))
             return true
         }
@@ -1481,7 +1508,7 @@ class KirimlyServerManager(
         private const val THUMBNAIL_PX = 240
         /** 512 KB reads keep Wi-Fi saturated when serving downloads; 8 KB reads cost many suspends. */
         private const val STREAM_BUFFER = 512 * 1024
-        val FEATURES = listOf("chunked-v2", "e2e-ecdh-aesgcm", "zip", "folders", "trusted-devices")
+        val FEATURES = listOf("chunked-v2", "e2e-ecdh-aesgcm", "zip", "folders", "trusted-devices", "clipboard")
         const val NO_NETWORK_IP = "0.0.0.0"
         const val APPROVAL_TIMEOUT_MS = 55_000L
         private const val CONNECTION_IDLE_TIMEOUT_SECONDS = 180

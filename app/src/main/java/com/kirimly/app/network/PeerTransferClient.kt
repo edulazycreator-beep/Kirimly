@@ -94,6 +94,27 @@ class PeerTransferClient(
         pin?.let { header(KirimlyServerManager.PIN_HEADER, it) }
     }
 
+    /**
+     * Clipboard sync (Pro): sends copied text to a peer that remembers this device. No PIN, no
+     * history entry on either side. Returns true when the peer accepted it.
+     */
+    suspend fun sendClipboard(peer: PeerDevice, text: String, senderName: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val response = client.post(baseUrl(peer.host, peer.port) + "/api/text") {
+                identify()
+                contentType(ContentType.Application.Json)
+                setBody(TextBody(text = text, deviceName = senderName, deviceId = deviceId.ifBlank { null }, clipboard = true))
+                timeout {
+                    connectTimeoutMillis = 2_500L
+                    requestTimeoutMillis = 6_000L
+                }
+            }
+            response.status.isSuccess()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     /** Lightweight ping used by discovery to confirm a peer is a live Kirimly server. */
     suspend fun fetchInfo(host: String, port: Int): ServerInfoResponse? = withContext(Dispatchers.IO) {
         try {
@@ -278,7 +299,8 @@ class PeerTransferClient(
                             index = index,
                             name = file.displayName,
                             size = file.sizeBytes,
-                            mimeType = file.mimeType
+                            mimeType = file.mimeType,
+                            relativePath = file.relativePath
                         )
                     )
                 }

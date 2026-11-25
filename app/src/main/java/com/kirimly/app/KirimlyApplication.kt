@@ -5,7 +5,10 @@ import android.app.Application
 import android.content.Context
 import com.kirimly.app.data.db.KirimlyDatabase
 import com.kirimly.app.data.prefs.UserPreferencesRepository
+import com.kirimly.app.billing.ProManager
+import com.kirimly.app.network.ClipboardSync
 import com.kirimly.app.network.KirimlyServerManager
+import com.kirimly.app.network.ServerEvent
 import com.kirimly.app.network.NsdDiscoveryManager
 import com.kirimly.app.network.PeerTransferClient
 import com.kirimly.app.network.SharedFileCache
@@ -54,6 +57,8 @@ class AppContainer(context: Context) {
         PeerTransferClient(appContext, database.transferDao(), transferTracker)
     val nsdManager: NsdDiscoveryManager =
         NsdDiscoveryManager(appContext, appScope) { host, port -> peerClient.fetchInfo(host, port) }
+    val proManager: ProManager = ProManager(appContext, appScope, preferences)
+    val clipboardSync: ClipboardSync = ClipboardSync(peerClient, nsdManager, serverManager)
 
 
     init {
@@ -68,5 +73,15 @@ class AppContainer(context: Context) {
                 nsdManager.updateLocalName(prefs.deviceNickname)
             }
         }
+        appScope.launch {
+            serverManager.events.collect { event ->
+                when (event) {
+                    is ServerEvent.ClipboardReceived -> clipboardSync.markSeen(event.text)
+                    is ServerEvent.TextReceived -> clipboardSync.markSeen(event.text)
+                    else -> Unit
+                }
+            }
+        }
+        proManager.connect()
     }
 }

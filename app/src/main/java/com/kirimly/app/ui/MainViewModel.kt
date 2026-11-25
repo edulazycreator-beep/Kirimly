@@ -1,6 +1,13 @@
 package com.kirimly.app.ui
 
+import android.app.Activity
 import android.app.Application
+import android.provider.DocumentsContract
+import com.kirimly.app.billing.ProManager
+import com.kirimly.app.data.model.SharedFile
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.update
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -64,6 +71,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .filterNotNull()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UserPreferencesRepository.DEFAULT)
 
+    /** Kirimly Pro (one-time Google Play purchase). */
+    val isPro: StateFlow<Boolean> = preferences
+        .map { it.isPro }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val proPrice: StateFlow<String?> = container.proManager.price
+    val proStatus: StateFlow<ProManager.Status> = container.proManager.status
+
     val serverState: StateFlow<ServerState> = serverManager.serverState
     val pin: StateFlow<String> = serverManager.pin
     val sharedItems: StateFlow<List<SharedItem>> = serverManager.sharedItems
@@ -104,12 +118,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _historyFilter = MutableStateFlow(HistoryFilter.ALL)
     val historyFilter: StateFlow<HistoryFilter> = _historyFilter.asStateFlow()
 
-    val history: StateFlow<List<TransferItem>> = combine(
+    private data class HistoryView(val items: List<TransferItem>, val hidden: Int)
+
+    private val historyView: StateFlow<HistoryView> = combine(
         dao.observeAll(),
         _historyQuery,
-        _historyFilter
-    ) { records, query, filter ->
-        val needle = query.trim()
+        _historyFilter,
+        isPro
+    ) { records, query, filter, pro ->
+        // Free: the most recent entries, no search. Pro: everything, searchable. Nothing is deleted.
+        val needle = if (pro) query.trim() else ""
         records.asSequence()
             .map { it.toDomain() }
             .filter { item ->
@@ -126,10 +144,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     (item.textContent?.contains(needle, ignoreCase = true) == true)
             }
             .toList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .let { all ->
+                if (pro || all.size <= FREE_HISTORY_LIMIT) HistoryView(all, 0)
+                else HistoryView(all.take(FREE_HISTORY_LIMIT), all.size - FREE_HISTORY_LIMIT)
+            }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryView(emptyList(), 0))
 
-    private val _sendingPeerId = MutableStateFlow<String?>(null)
-    val sendingPeerId: StateFlow<String?> = _sendingPeerId.asStateFlow()
+    val history: StateFlow<List<TransferItem>> = historyView
+        .map { it.items }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Older entries kept in the database but only shown with Pro. */
+    val historyHiddenCount: StateFlow<Int> = historyView
+        .map { it.hidden }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    private val _sendingPeerIds = MutableStateFlow<Set<String>>(emptySet())
+    val sendingPeerIds: StateFlow<Set<String>> = _sendingPeerIds.asStateFlow()
 
     private val _crashLogCount = MutableStateFlow(0)
     val crashLogCount: StateFlow<Int> = _crashLogCount.asStateFlow()
@@ -156,8 +187,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else tr(R.string.u_msg_browser_declined, event.browserName)
                     )
                     is ServerEvent.AddressChanged -> _messages.trySend(tr(R.string.u_msg_address_changed))
+                    is ServerEvent.ClipboardReceived -> _messages.trySend(tr(R.string.p_msg_clip_received, event.from))
                 }
             }
+        }
+        viewModelScope.launch {
+            container.proManager.messages.collect { _messages.trySend(it) }
         }
     }
 
@@ -277,11 +312,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _messages.trySend(tr(R.string.u_msg_queue_empty))
             return
         }
-        if (_sendingPeerId.value != null) return
-        _sendingPeerId.value = peer.id
+        if (_sendingPeerIds.value.isNotEmpty()) return
+        _sendingPeerIds.value = setOf(peer.id)
         viewModelScope.launch {
             val result = container.peerClient.sendItems(peer, pin, items, preferences.value.deviceNickname)
-            _sendingPeerId.value = null
+            _sendingPeerIds.value = emptySet()
             val message = when (result) {
                 is PeerSendResult.Success -> {
                     clearQueue()
@@ -293,6 +328,143 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 is PeerSendResult.Failed -> tr(R.string.u_msg_send_failed, result.message)
             }
             _messages.trySend(message)
+        }
+    }
+
+    /**
+     * Pro: sends the same queue to several devices at once. Android peers receive in parallel;
+     * Safari tabs get the usual accept/download prompt. Peers that still ask for a code are listed.
+     */
+    fun sendToMany(peers: List<PeerDevice>, browsers: List<ConnectedBrowser>) {
+        if (!isPro.value) return
+        val items = sharedItems.value
+        if (items.isEmpty()) {
+            _messages.trySend(tr(R.string.u_msg_queue_empty))
+            return
+        }
+        if (_sendingPeerIds.value.isNotEmpty() || (peers.isEmpty() && browsers.isEmpty())) return
+        val offered = browsers.count { serverManager.offerToBrowser(it.id) }
+        if (peers.isEmpty()) {
+            _messages.trySend(tr(R.string.p_msg_multi_result, offered, browsers.size))
+            return
+        }
+        _sendingPeerIds.value = peers.map { it.id }.toSet()
+        val nickname = preferences.value.deviceNickname
+        viewModelScope.launch {
+            val results = peers.map { peer ->
+                async {
+                    val result = container.peerClient.sendItems(peer, null, items, nickname)
+                    _sendingPeerIds.update { it - peer.id }
+                    peer to result
+                }
+            }.awaitAll()
+            val ok = results.count { it.second is PeerSendResult.Success } + offered
+            val needCode = results.filter { it.second == PeerSendResult.PinRejected }.map { it.first.name }
+            // Safari tabs download from the queue, so it stays while they are offered it.
+            if (ok == peers.size + browsers.size && browsers.isEmpty()) clearQueue()
+            val summary = tr(R.string.p_msg_multi_result, ok, peers.size + browsers.size)
+            _messages.trySend(
+                if (needCode.isEmpty()) summary
+                else summary + " " + tr(R.string.p_msg_multi_need_code, needCode.joinToString(", "))
+            )
+        }
+    }
+
+    /**
+     * Pro: adds every file inside a picked folder, keeping "Folder/sub/file" so the receiver
+     * recreates the same structure in Downloads/Kirimly.
+     */
+    fun addFolder(treeUri: Uri) {
+        if (!isPro.value) return
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val (files, skipped) = withContext(Dispatchers.IO) {
+                try {
+                    app.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (_: Exception) {
+                }
+                val out = mutableListOf<SharedFile>()
+                var skippedCount = 0
+                val columns = arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    DocumentsContract.Document.COLUMN_SIZE
+                )
+                fun walk(docId: String, path: String, depth: Int) {
+                    if (depth > MAX_FOLDER_DEPTH) return
+                    val children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
+                    try {
+                        app.contentResolver.query(children, columns, null, null, null)?.use { c ->
+                            while (c.moveToNext()) {
+                                if (out.size >= MAX_FOLDER_FILES) {
+                                    skippedCount++
+                                    continue
+                                }
+                                val id = c.getString(0) ?: continue
+                                val name = c.getString(1)?.takeIf { it.isNotBlank() } ?: continue
+                                val mime = c.getString(2).orEmpty()
+                                if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                                    walk(id, "$path/$name", depth + 1)
+                                } else {
+                                    val size = if (c.isNull(3)) -1L else c.getLong(3)
+                                    if (size < 0L) {
+                                        skippedCount++
+                                    } else {
+                                        out += SharedFile(
+                                            id = UUID.randomUUID().toString(),
+                                            uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, id),
+                                            displayName = name,
+                                            sizeBytes = size,
+                                            mimeType = mime.takeIf { it.isNotBlank() && it != "application/octet-stream" }
+                                                ?: NetworkUtils.resolveMimeType(name),
+                                            relativePath = "$path/$name"
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
+                        skippedCount++
+                    }
+                }
+                val rootId = DocumentsContract.getTreeDocumentId(treeUri)
+                val rootName = try {
+                    app.contentResolver.query(
+                        DocumentsContract.buildDocumentUriUsingTree(treeUri, rootId),
+                        arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null
+                    )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                } catch (_: Exception) {
+                    null
+                }?.takeIf { it.isNotBlank() } ?: "Kirimly"
+                walk(rootId, rootName, 0)
+                out to skippedCount
+            }
+            if (files.isEmpty()) {
+                _messages.trySend(tr(R.string.p_msg_folder_empty))
+            } else {
+                serverManager.addSharedItems(files)
+                _messages.trySend(
+                    if (skipped == 0) tr(R.string.p_msg_folder_added, files.size)
+                    else tr(R.string.p_msg_folder_added_skipped, files.size, skipped)
+                )
+            }
+        }
+    }
+
+    /** Pro clipboard sync: Android only allows reading the clipboard while Kirimly has focus. */
+    fun onAppFocused() {
+        val prefs = preferences.value
+        if (!prefs.isPro || !prefs.clipboardSync) return
+        val text = try {
+            readClipboardText()
+        } catch (_: Exception) {
+            null
+        } ?: return
+        if (text.length > MAX_CLIP_LENGTH || !container.clipboardSync.isNew(text)) return
+        viewModelScope.launch {
+            val count = container.clipboardSync.push(text, prefs.deviceNickname)
+            if (count > 0) _messages.trySend(tr(R.string.p_msg_clip_sent, count))
         }
     }
 
@@ -342,7 +514,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setPalette(palette: AppPalette) {
+        if (palette != AppPalette.MIDNIGHT_MONO && !isPro.value) return
         viewModelScope.launch { container.preferences.setPalette(palette) }
+    }
+
+    fun buyPro(activity: Activity) = container.proManager.purchase(activity)
+
+    fun restorePro() {
+        viewModelScope.launch { container.proManager.restore() }
+    }
+
+    fun setDebugPro(enabled: Boolean) = container.proManager.setDebugPro(enabled)
+
+    fun setClipboardSync(enabled: Boolean) {
+        if (enabled && !isPro.value) return
+        viewModelScope.launch { container.preferences.setClipboardSync(enabled) }
+    }
+
+    fun setPortalName(name: String) {
+        if (!isPro.value) return
+        viewModelScope.launch { container.preferences.setPortalName(name) }
     }
 
     fun setNickname(nickname: String) {
@@ -382,5 +573,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         const val ROUTE_RECEIVE = "receive"
         const val ROUTE_HISTORY = "history"
         const val EXTRA_OPEN_TAB = "open_tab"
+        const val FREE_HISTORY_LIMIT = 20
+        private const val MAX_FOLDER_FILES = 2_000
+        private const val MAX_FOLDER_DEPTH = 12
+        private const val MAX_CLIP_LENGTH = 100_000
     }
 }

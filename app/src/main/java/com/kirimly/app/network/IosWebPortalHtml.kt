@@ -185,6 +185,12 @@ label.btn { display: block; text-align: center; }
 .actions .btn { flex: 1; }
 a.btn { text-align: center; text-decoration: none; display: block; }
 
+/* ---------- Clipboard sync (Kirimly Pro) ---------- */
+.clipbar { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 70; background: var(--raise); border: 1px solid #3a3a3a; padding: 14px 16px; display: none; max-width: 560px; margin: 0 auto; }
+.clipbar.show { display: block; animation: spFade .25s ease; }
+.clipbar .clip-from { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+.clipbar .clip-text { margin: 0 0 12px; max-height: 96px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 15px; }
+.clipbar .clip-actions { display: flex; gap: 8px; justify-content: flex-end; }
 /* ---------- Intro animation (about 6 s) ---------- */
 .splash { position: fixed; inset: 0; z-index: 100; background: #000000; display: flex; align-items: center; justify-content: center; transition: opacity .6s ease, visibility .6s ease; cursor: pointer; }
 .splash.hide { opacity: 0; visibility: hidden; }
@@ -334,6 +340,11 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   </div>
 </div>
 
+<div id="clipbar" class="clipbar" role="status" aria-live="polite">
+  <p id="clipFrom" class="clip-from"></p>
+  <p id="clipText" class="clip-text"></p>
+  <div class="clip-actions"><button id="clipClose" class="btn ghost small" type="button">Tutup</button><button id="clipCopy" class="btn small" type="button">Salin</button></div>
+</div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 """
@@ -345,6 +356,10 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   /* The Android app writes its own language into <html lang>, so the page always matches the app. */
   var LANG = (document.documentElement.getAttribute('lang') || 'id').toLowerCase().indexOf('en') === 0 ? 'en' : 'id';
   var EN = {
+    'Clipboard dari ': 'Clipboard from ',
+    'Disalin ke clipboard': 'Copied to clipboard',
+    'Tidak bisa menyalin. Tekan lama teksnya untuk menyalin.': 'Couldn\'t copy. Press and hold the text to copy it.',
+    'Tutup': 'Close',
     'Kirim file tanpa kabel.': 'Send files without cables.',
     'Menghubungkan ke Android…': 'Connecting to Android…',
     'Ketuk untuk lewati': 'Tap to skip',
@@ -564,6 +579,47 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.className = 'toast'; }, 3000);
   }
+
+  /* ---------- Clipboard sync (Kirimly Pro) ---------- */
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return legacyCopy(text); });
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.fontSize = '16px';
+    document.body.appendChild(ta);
+    var range = document.createRange();
+    range.selectNodeContents(ta);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ta.setSelectionRange(0, text.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  var clipValue = '';
+  function showClip(text, from) {
+    if (!text) return;
+    clipValue = text;
+    el('clipFrom').textContent = T('Clipboard dari ') + (from || 'Android');
+    el('clipText').textContent = text.length > 600 ? text.slice(0, 600) + '…' : text;
+    el('clipbar').className = 'clipbar show';
+  }
+  el('clipClose').addEventListener('click', function () { el('clipbar').className = 'clipbar'; });
+  el('clipCopy').addEventListener('click', function () {
+    copyText(clipValue).then(function (ok) {
+      toast(ok ? T('Disalin ke clipboard') : T('Tidak bisa menyalin. Tekan lama teksnya untuk menyalin.'), ok ? '' : 'err');
+      if (ok) el('clipbar').className = 'clipbar';
+    });
+  });
 
   function guessDevice() {
     var ua = navigator.userAgent || '';
@@ -882,6 +938,8 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       if (msg.type === 'shared-updated') loadShared();
       if (msg.type === 'offer') showOffer(msg);
+      if (msg.type === 'clip') showClip(msg.message || '', msg.sender || '');
+      if (msg.type === 'name-changed' && msg.message) el('deviceName').textContent = msg.message;
       if (msg.type === 'pin-changed' && !(state.info && state.info.trusted)) handleUnauthorized();
       if (msg.type === 'server-stopping') toast(T('Server Android dihentikan.'), 'err');
       if (msg.type === 'address-changed') toast(T('Alamat Android berubah ke ') + msg.message + T('. Pindai ulang QR jika halaman berhenti merespons.'), 'err');

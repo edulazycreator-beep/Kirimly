@@ -79,7 +79,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val loaded by viewModel.loadedPreferences.collectAsStateWithLifecycle()
             val preferences = loaded ?: UserPreferencesRepository.DEFAULT
-            KirimlyTheme(themeMode = preferences.themeMode, palette = preferences.palette) {
+            KirimlyTheme(
+                themeMode = preferences.themeMode,
+                // Extra palettes are part of Kirimly Pro; without it the app stays Midnight Mono.
+                palette = if (preferences.isPro) preferences.palette else com.kirimly.app.data.model.AppPalette.MIDNIGHT_MONO
+            ) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val current = loaded
                     if (current != null) {
@@ -121,6 +125,14 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshAddress()
+        // Re-check the Play purchase (refunds, purchases made on another device).
+        (application as KirimlyApplication).container.proManager.connect()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Android only lets a focused app read the clipboard; this is when Pro clipboard sync runs.
+        if (hasFocus) window.decorView.postDelayed({ viewModel.onAppFocused() }, 300L)
     }
 
     companion object {

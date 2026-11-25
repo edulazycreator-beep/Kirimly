@@ -31,7 +31,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.rounded.CreateNewFolder
+import androidx.compose.material.icons.rounded.Devices
+import com.kirimly.app.ui.components.ProBadge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -79,13 +83,17 @@ import com.kirimly.app.util.tr
 fun SendScreen(
     viewModel: MainViewModel,
     onOpenSettings: () -> Unit,
-    onOpenReceive: () -> Unit
+    onOpenReceive: () -> Unit,
+    onOpenPro: () -> Unit
 ) {
+    val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val peers by viewModel.peers.collectAsStateWithLifecycle()
     val browsers by viewModel.browsers.collectAsStateWithLifecycle()
     val queue by viewModel.sharedItems.collectAsStateWithLifecycle()
     val totalBytes by viewModel.queueTotalBytes.collectAsStateWithLifecycle()
-    val sendingPeerId by viewModel.sendingPeerId.collectAsStateWithLifecycle()
+    val sendingPeerIds by viewModel.sendingPeerIds.collectAsStateWithLifecycle()
+    var multiMode by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(setOf<String>()) }
     val unreachable by viewModel.unreachablePeers.collectAsStateWithLifecycle()
     val sending by viewModel.sendingTransfers.collectAsStateWithLifecycle()
 
@@ -94,6 +102,9 @@ fun SendScreen(
 
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         viewModel.addUris(uris)
+    }
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let(viewModel::addFolder)
     }
 
     DisposableEffect(Unit) {
@@ -160,6 +171,18 @@ fun SendScreen(
                             Text(tr(R.string.u_add_text))
                         }
                     }
+                    TextButton(
+                        onClick = { if (isPro) pickFolder.launch(null) else onOpenPro() },
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(tr(R.string.p_pick_folder))
+                        if (!isPro) {
+                            Spacer(Modifier.size(8.dp))
+                            ProBadge(locked = true)
+                        }
+                    }
                     if (queue.isEmpty()) {
                         Text(
                             tr(R.string.u_queue_empty_hint),
@@ -168,9 +191,17 @@ fun SendScreen(
                         )
                     } else {
                         Column {
-                            queue.forEach { item ->
+                            queue.take(MAX_QUEUE_ROWS).forEach { item ->
                                 QueueRow(item = item, onRemove = { viewModel.removeItem(item.id) })
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                            if (queue.size > MAX_QUEUE_ROWS) {
+                                Text(
+                                    tr(R.string.p_more_items, queue.size - MAX_QUEUE_ROWS),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -191,13 +222,37 @@ fun SendScreen(
                     if (unreachable.isNotEmpty()) {
                         Notice(tr(R.string.u_isolation, unreachable.joinToString(", ")))
                     }
+                    val destinationCount = peers.size + browsers.size
+                    val multi = multiMode && isPro && destinationCount >= 2
+                    val toggle = { key: String -> selected = if (key in selected) selected - key else selected + key }
+                    if (destinationCount >= 2) {
+                        TextButton(
+                            onClick = {
+                                if (!isPro) onOpenPro() else {
+                                    multiMode = !multiMode
+                                    selected = emptySet()
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            Icon(Icons.Rounded.Devices, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text(tr(if (multi) R.string.p_multi_off else R.string.p_multi_on))
+                            if (!isPro) {
+                                Spacer(Modifier.size(8.dp))
+                                ProBadge(locked = true)
+                            }
+                        }
+                    }
                     peers.forEach { peer ->
                         DestinationRow(
                             icon = Icons.Rounded.PhoneAndroid,
                             title = peer.name,
                             subtitle = tr(R.string.u_dest_android),
-                            busy = sendingPeerId == peer.id,
-                            enabled = queue.isNotEmpty() && sendingPeerId == null,
+                            busy = peer.id in sendingPeerIds,
+                            enabled = queue.isNotEmpty() && sendingPeerIds.isEmpty(),
+                            checked = if (multi) "p:" + peer.id in selected else null,
+                            onCheck = { toggle("p:" + peer.id) },
                             onSend = { if (peer.pinRequired) pinTarget = peer else viewModel.sendToPeer(peer, null) }
                         )
                     }
@@ -208,7 +263,30 @@ fun SendScreen(
                             subtitle = tr(R.string.u_dest_safari),
                             busy = false,
                             enabled = queue.isNotEmpty(),
+                            checked = if (multi) "b:" + browser.id in selected else null,
+                            onCheck = { toggle("b:" + browser.id) },
                             onSend = { viewModel.offerToBrowser(browser) }
+                        )
+                    }
+                    if (multi) {
+                        val chosenPeers = peers.filter { "p:" + it.id in selected }
+                        val chosenBrowsers = browsers.filter { "b:" + it.id in selected }
+                        val count = chosenPeers.size + chosenBrowsers.size
+                        Button(
+                            onClick = {
+                                viewModel.sendToMany(chosenPeers, chosenBrowsers)
+                                multiMode = false
+                                selected = emptySet()
+                            },
+                            enabled = count > 0 && queue.isNotEmpty() && sendingPeerIds.isEmpty(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                        ) { Text(tr(R.string.p_multi_send, count)) }
+                        Text(
+                            tr(R.string.p_multi_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     if (peers.isEmpty() && browsers.isEmpty()) {
@@ -267,6 +345,8 @@ fun SendScreen(
         )
     }
 }
+
+private const val MAX_QUEUE_ROWS = 40
 
 @Composable
 internal fun StepCard(number: Int?, title: String, content: @Composable () -> Unit) {
@@ -327,7 +407,12 @@ private fun QueueRow(item: SharedItem, onRemove: () -> Unit) {
                 .weight(1f)
                 .padding(horizontal = 12.dp)
         ) {
-            Text(item.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                (item as? SharedFile)?.relativePath ?: item.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(
                 when (item) {
                     is SharedFile -> NetworkUtils.formatFileSize(item.sizeBytes)
@@ -348,6 +433,8 @@ private fun DestinationRow(
     subtitle: String,
     busy: Boolean,
     enabled: Boolean,
+    checked: Boolean? = null,
+    onCheck: () -> Unit = {},
     onSend: () -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -360,10 +447,10 @@ private fun DestinationRow(
             Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (busy) {
-            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-        } else {
-            FilledTonalButton(onClick = onSend, enabled = enabled) { Text(tr(R.string.u_send)) }
+        when {
+            busy -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            checked != null -> Checkbox(checked = checked, onCheckedChange = { onCheck() })
+            else -> FilledTonalButton(onClick = onSend, enabled = enabled) { Text(tr(R.string.u_send)) }
         }
     }
 }

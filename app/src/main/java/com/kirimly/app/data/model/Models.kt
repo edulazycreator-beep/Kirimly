@@ -78,7 +78,9 @@ data class SharedFile(
     val uri: Uri,
     override val displayName: String,
     override val sizeBytes: Long,
-    override val mimeType: String
+    override val mimeType: String,
+    /** "Folder/sub/name.ext" when the file came from a picked folder (Pro); keeps the structure on arrival. */
+    val relativePath: String? = null
 ) : SharedItem
 
 data class SharedText(
@@ -207,8 +209,18 @@ data class UserPreferences(
     val deviceId: String,
     val trustedDevices: List<TrustedDevice>,
     /** Stop the server after this many idle minutes while the app is in the background; 0 = never. */
-    val idleStopMinutes: Int
-)
+    val idleStopMinutes: Int,
+    /** Cached result of the last Google Play purchase check, so Pro works offline. */
+    val proOwned: Boolean = false,
+    /** Debug builds only: lets testers turn Pro on without a Play purchase. */
+    val debugPro: Boolean = false,
+    /** Pro: send copied text to remembered devices automatically when Kirimly is opened. */
+    val clipboardSync: Boolean = false,
+    /** Pro: name shown on the iPhone / iPad portal instead of the device name. Blank = device name. */
+    val portalName: String = ""
+) {
+    val isPro: Boolean get() = proOwned || (com.kirimly.app.BuildConfig.DEBUG && debugPro)
+}
 
 /** A Safari / browser tab currently connected to the portal over WebSocket. */
 data class ConnectedBrowser(

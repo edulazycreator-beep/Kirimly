@@ -51,7 +51,8 @@ import kotlinx.coroutines.delay
 fun ApprovalBottomSheet(
     request: PendingTransferRequest,
     onAccept: (trust: Boolean) -> Unit,
-    onDecline: () -> Unit
+    onDecline: () -> Unit,
+    autoAcceptTrusted: Boolean = true
 ) {
     var trust by remember(request.id) { mutableStateOf(true) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -195,7 +196,7 @@ fun ApprovalBottomSheet(
                     Column(modifier = Modifier.padding(start = 8.dp)) {
                         Text(tr(R.string.s_percayai_perangkat_ini), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            tr(R.string.s_kiriman_berikutnya_dari_diterima_otomatis, request.deviceName),
+                            tr(if (autoAcceptTrusted) R.string.s_kiriman_berikutnya_dari_diterima_otomatis else R.string.p_trust_free_body, request.deviceName),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
