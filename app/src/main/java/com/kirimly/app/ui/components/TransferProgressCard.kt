@@ -85,7 +85,8 @@ fun TransferProgressCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = (if (progress.direction == TransferDirection.RECEIVED) "Dari " else "Ke ") + progress.peerName,
+                        text = (if (progress.direction == TransferDirection.RECEIVED) "Dari " else "Ke ") + progress.peerName +
+                            if (progress.encrypted) " • terenkripsi" else "",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

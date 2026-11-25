@@ -83,7 +83,8 @@ import com.kirimly.app.ui.components.fileIconFor
 @Composable
 fun SendScreen(
     viewModel: MainViewModel,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenReceive: () -> Unit
 ) {
     val peers by viewModel.peers.collectAsStateWithLifecycle()
     val isDiscovering by viewModel.isDiscovering.collectAsStateWithLifecycle()
@@ -91,6 +92,7 @@ fun SendScreen(
     val totalBytes by viewModel.queueTotalBytes.collectAsStateWithLifecycle()
     val serverState by viewModel.serverState.collectAsStateWithLifecycle()
     val sendingPeerId by viewModel.sendingPeerId.collectAsStateWithLifecycle()
+    val unreachablePeers by viewModel.unreachablePeers.collectAsStateWithLifecycle()
 
     var textDraft by rememberSaveable { mutableStateOf("") }
     var pinTarget by remember { mutableStateOf<PeerDevice?>(null) }
@@ -156,6 +158,12 @@ fun SendScreen(
                     onRescan = viewModel::rescan,
                     onToggleServer = viewModel::toggleServer
                 )
+            }
+
+            if (unreachablePeers.isNotEmpty()) {
+                item(key = "isolation") {
+                    IsolationBanner(names = unreachablePeers, onUseHotspot = onOpenReceive)
+                }
             }
 
             item(key = "actions") {
@@ -498,4 +506,31 @@ private fun PinEntryDialog(peer: PeerDevice, onDismiss: () -> Unit, onConfirm: (
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
     )
+}
+
+@Composable
+private fun IsolationBanner(names: List<String>, onUseHotspot: () -> Unit) {
+    Surface(
+        shape = RectangleShape,
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Wi-Fi ini tampaknya memblokir koneksi antarperangkat",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                names.joinToString(", ") + " terlihat di jaringan, tetapi tidak bisa dihubungi. " +
+                    "Ini biasa terjadi di Wi-Fi kantor, kampus, atau kafe (client isolation). " +
+                    "Gunakan hotspot lokal dari salah satu HP.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            TextButton(onClick = onUseHotspot, contentPadding = PaddingValues(0.dp)) {
+                Text("Buka hotspot lokal di tab Terima")
+            }
+        }
+    }
 }

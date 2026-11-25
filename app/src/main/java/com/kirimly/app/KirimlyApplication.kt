@@ -8,6 +8,7 @@ import com.kirimly.app.network.HotspotManager
 import com.kirimly.app.network.KirimlyServerManager
 import com.kirimly.app.network.NsdDiscoveryManager
 import com.kirimly.app.network.PeerTransferClient
+import com.kirimly.app.network.SharedFileCache
 import com.kirimly.app.network.TransferTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,7 @@ class AppContainer(context: Context) {
     val preferences: UserPreferencesRepository = UserPreferencesRepository(appContext)
     val transferTracker: TransferTracker = TransferTracker(appScope)
     val serverManager: KirimlyServerManager =
-        KirimlyServerManager(appContext, database.transferDao(), transferTracker, appScope)
+        KirimlyServerManager(appContext, database.transferDao(), transferTracker, appScope, preferences)
     val peerClient: PeerTransferClient =
         PeerTransferClient(appContext, database.transferDao(), transferTracker)
     val nsdManager: NsdDiscoveryManager =
@@ -42,9 +43,14 @@ class AppContainer(context: Context) {
     val hotspotManager: HotspotManager = HotspotManager(appContext)
 
     init {
+        appScope.launch(Dispatchers.IO) {
+            preferences.ensureDeviceId()
+            SharedFileCache.pruneStale(appContext)
+        }
         appScope.launch {
             preferences.preferencesFlow.collect { prefs ->
-                serverManager.updatePreferences(prefs.deviceNickname, prefs.pinRequired)
+                serverManager.updatePreferences(prefs)
+                peerClient.deviceId = prefs.deviceId
                 nsdManager.updateLocalName(prefs.deviceNickname)
             }
         }

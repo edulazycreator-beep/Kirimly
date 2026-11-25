@@ -11,7 +11,9 @@ data class ServerInfoResponse(
     val deviceName: String,
     val platform: String = "android",
     val pinRequired: Boolean,
-    val sharedCount: Int = 0
+    val sharedCount: Int = 0,
+    val features: List<String> = emptyList(),
+    val trusted: Boolean = false
 )
 
 @Serializable
@@ -24,6 +26,7 @@ data class FileMetaDto(
 @Serializable
 data class UploadRequestBody(
     val deviceName: String = "",
+    val deviceId: String? = null,
     val files: List<FileMetaDto> = emptyList()
 )
 
@@ -45,7 +48,8 @@ data class UploadResponse(
 @Serializable
 data class TextBody(
     val text: String = "",
-    val deviceName: String = ""
+    val deviceName: String = "",
+    val deviceId: String? = null
 )
 
 @Serializable
@@ -76,4 +80,44 @@ data class WsMessage(
     val message: String? = null,
     val fileName: String? = null,
     val progress: Float? = null
+)
+
+@Serializable
+data class UploadInitBody(
+    val token: String,
+    val index: Int,
+    val name: String,
+    val size: Long,
+    val mimeType: String = "application/octet-stream",
+    val relativePath: String? = null,
+    val sha256: String? = null,
+    val publicKey: String? = null
+)
+
+@Serializable
+data class UploadInitResponse(
+    val uploadId: String,
+    val offset: Long,
+    val chunkSize: Int,
+    val encrypted: Boolean,
+    val serverPublicKey: String? = null
+)
+
+@Serializable
+data class UploadChunkResponse(
+    val offset: Long,
+    val message: String? = null
+)
+
+@Serializable
+data class UploadCompleteBody(
+    val sha256: String? = null
+)
+
+@Serializable
+data class UploadCompleteResponse(
+    val ok: Boolean,
+    val savedName: String? = null,
+    val sha256: String? = null,
+    val message: String? = null
 )

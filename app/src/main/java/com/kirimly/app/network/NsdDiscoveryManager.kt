@@ -42,6 +42,13 @@ class NsdDiscoveryManager(
     private val _isDiscovering = MutableStateFlow(false)
     val isDiscovering: StateFlow<Boolean> = _isDiscovering.asStateFlow()
 
+    /**
+     * Services that answered mDNS but not HTTP: a strong hint that the Wi-Fi blocks traffic
+     * between clients (AP / client isolation, common on office, campus and café networks).
+     */
+    private val _unreachablePeers = MutableStateFlow<List<String>>(emptyList())
+    val unreachablePeers: StateFlow<List<String>> = _unreachablePeers.asStateFlow()
+
     private val _isRegistered = MutableStateFlow(false)
     val isRegistered: StateFlow<Boolean> = _isRegistered.asStateFlow()
 
@@ -204,6 +211,7 @@ class NsdDiscoveryManager(
         }
         cleanupDiscovery()
         _isDiscovering.value = false
+        _unreachablePeers.value = emptyList()
     }
 
     /** Re-scans: stop and start discovery, keeping verified peers. */
@@ -248,7 +256,14 @@ class NsdDiscoveryManager(
         val host = extractHost(info) ?: return
         val ownAddresses = NetworkUtils.getAllLocalIpv4Addresses().map { it.second }.toSet()
         if (host in ownAddresses) return
-        val serverInfo = verifier(host, info.port) ?: return
+        val serverInfo = verifier(host, info.port)
+        if (serverInfo == null) {
+            val label = info.serviceName.removePrefix("Kirimly-").ifBlank { host }
+            _unreachablePeers.update { list -> (list.filterNot { it == label } + label).takeLast(5) }
+            return
+        }
+        val reachableLabel = info.serviceName.removePrefix("Kirimly-")
+        _unreachablePeers.update { list -> list.filterNot { it == reachableLabel } }
         val peer = PeerDevice(
             id = info.serviceName,
             name = serverInfo.deviceName,

@@ -4,6 +4,19 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import android.net.NetworkRequest
+import com.kirimly.app.data.model.UserPreferences
+import com.kirimly.app.data.prefs.UserPreferencesRepository
+import io.ktor.server.response.respondOutputStream
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import java.security.KeyPair
+import java.util.zip.Deflater
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import com.kirimly.app.data.db.TransferDao
 import com.kirimly.app.data.db.TransferRecordEntity
 import com.kirimly.app.data.model.IncomingFileMeta
@@ -84,6 +97,8 @@ sealed interface ServerEvent {
     data class FileFailed(val fileName: String, val reason: String) : ServerEvent
     data class TextReceived(val text: String, val from: String) : ServerEvent
     data class FileDownloaded(val fileName: String, val by: String) : ServerEvent
+    data class TrustedAutoAccepted(val request: PendingTransferRequest) : ServerEvent
+    data class AddressChanged(val ip: String) : ServerEvent
 }
 
 /**
@@ -94,7 +109,8 @@ class KirimlyServerManager(
     private val appContext: Context,
     private val dao: TransferDao,
     private val tracker: TransferTracker,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val preferences: UserPreferencesRepository
 ) {
 
     private val jsonCodec = Json {
@@ -129,6 +145,22 @@ class KirimlyServerManager(
     @Volatile
     private var deviceName: String = "Android"
 
+    @Volatile
+    private var trustedDevices: Map<String, String> = emptyMap()
+
+    @Volatile
+    private var convertHeic: Boolean = false
+
+    /** Server half of the ECDH exchange; regenerated each time the server starts. */
+    @Volatile
+    private var serverKeyPair: KeyPair = TransferCrypto.generateKeyPair()
+
+    private val uploads = ConcurrentHashMap<String, UploadSession>()
+    private val uploadsByFile = ConcurrentHashMap<String, String>()
+    private var janitorJob: Job? = null
+    private val mdnsResponder = MdnsHostResponder(appContext, scope)
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
     private val _pendingRequests = MutableStateFlow<List<PendingTransferRequest>>(emptyList())
     val pendingRequests: StateFlow<List<PendingTransferRequest>> = _pendingRequests.asStateFlow()
 
@@ -158,9 +190,11 @@ class KirimlyServerManager(
 
     // ------------------------------------------------------------------ public API
 
-    fun updatePreferences(name: String, pinRequired: Boolean) {
-        deviceName = name.ifBlank { "Android" }
-        _pinRequired.value = pinRequired
+    fun updatePreferences(prefs: UserPreferences) {
+        deviceName = prefs.deviceNickname.ifBlank { "Android" }
+        _pinRequired.value = prefs.pinRequired
+        convertHeic = prefs.convertHeic
+        trustedDevices = prefs.trustedDevices.associate { it.id to it.name }
     }
 
     fun refreshPin() {
@@ -179,16 +213,30 @@ class KirimlyServerManager(
     }
 
     fun removeSharedItem(id: String) {
+        _sharedItems.value.firstOrNull { it.id == id }?.let { releaseCached(it) }
         _sharedItems.update { list -> list.filterNot { it.id == id } }
         broadcast(WsMessage(type = "shared-updated"))
     }
 
     fun clearSharedItems() {
+        _sharedItems.value.forEach { releaseCached(it) }
         _sharedItems.value = emptyList()
         broadcast(WsMessage(type = "shared-updated"))
     }
 
-    fun respondToRequest(requestId: String, accept: Boolean) {
+    private fun releaseCached(item: SharedItem) {
+        if (item is SharedFile) scope.launch(Dispatchers.IO) { SharedFileCache.release(appContext, item.uri) }
+    }
+
+    fun respondToRequest(requestId: String, accept: Boolean, trust: Boolean = false) {
+        if (accept && trust) {
+            val request = _pendingRequests.value.firstOrNull { it.id == requestId }
+            val id = request?.deviceId
+            if (request != null && !id.isNullOrBlank()) {
+                trustedDevices = trustedDevices + (id to request.deviceName)
+                scope.launch { preferences.addTrustedDevice(id, request.deviceName) }
+            }
+        }
         decisions[requestId]?.complete(accept)
     }
 
@@ -221,8 +269,12 @@ class KirimlyServerManager(
             ) {
                 kirimlyModule()
             }
+            serverKeyPair = TransferCrypto.generateKeyPair()
             withContext(Dispatchers.IO) { server.start(wait = false) }
             engine = server
+            startJanitor()
+            registerNetworkCallback()
+            mdnsResponder.start()
             val ip = NetworkUtils.getLocalIpv4Address() ?: NO_NETWORK_IP
             val running = ServerState.Running(ip, port)
             _serverState.value = running
@@ -240,6 +292,16 @@ class KirimlyServerManager(
         decisions.values.forEach { it.complete(false) }
         decisions.clear()
         approvedSessions.clear()
+        janitorJob?.cancel()
+        janitorJob = null
+        unregisterNetworkCallback()
+        mdnsResponder.stop()
+        uploads.values.forEach { session ->
+            ResumableUploadStore.discard(appContext, session.target)
+            tracker.finish(session.trackId, TransferStatus.FAILED, session.written, "Server dihentikan")
+        }
+        uploads.clear()
+        uploadsByFile.clear()
         _pendingRequests.value = emptyList()
         val server = engine
         engine = null
@@ -268,6 +330,8 @@ class KirimlyServerManager(
             allowHeader(HttpHeaders.ContentType)
             allowHeader(PIN_HEADER)
             allowHeader(TOKEN_HEADER)
+            allowHeader(DEVICE_HEADER)
+            allowHeader(CHUNK_SHA_HEADER)
         }
         install(WebSockets) {
             pingPeriodMillis = 15_000L
@@ -297,7 +361,9 @@ class KirimlyServerManager(
                     ServerInfoResponse(
                         deviceName = deviceName,
                         pinRequired = _pinRequired.value,
-                        sharedCount = _sharedItems.value.size
+                        sharedCount = _sharedItems.value.size,
+                        features = FEATURES,
+                        trusted = isTrusted(call.request.headers[DEVICE_HEADER])
                     )
                 )
             }
@@ -324,8 +390,10 @@ class KirimlyServerManager(
                 }
                 val userAgent = call.request.headers[HttpHeaders.UserAgent].orEmpty()
                 val now = System.currentTimeMillis()
+                val claimedDeviceId = (body.deviceId ?: call.request.headers[DEVICE_HEADER])?.trim()?.take(64)?.ifBlank { null }
                 val request = PendingTransferRequest(
                     id = UUID.randomUUID().toString(),
+                    deviceId = claimedDeviceId,
                     deviceName = body.deviceName.trim().take(40).ifBlank { describeUserAgent(userAgent) },
                     userAgent = userAgent,
                     remoteAddress = call.request.origin.remoteHost,
@@ -340,15 +408,19 @@ class KirimlyServerManager(
                     createdAt = now,
                     expiresAt = now + APPROVAL_TIMEOUT_MS
                 )
-                val decision = CompletableDeferred<Boolean>()
-                decisions[request.id] = decision
-                _pendingRequests.update { it + request }
-                _events.tryEmit(ServerEvent.IncomingRequest(request))
-
-                val approved = withTimeoutOrNull(APPROVAL_TIMEOUT_MS) { decision.await() }
-
-                decisions.remove(request.id)
-                _pendingRequests.update { list -> list.filterNot { it.id == request.id } }
+                val approved: Boolean? = if (isTrusted(claimedDeviceId)) {
+                    _events.tryEmit(ServerEvent.TrustedAutoAccepted(request))
+                    true
+                } else {
+                    val decision = CompletableDeferred<Boolean>()
+                    decisions[request.id] = decision
+                    _pendingRequests.update { it + request }
+                    _events.tryEmit(ServerEvent.IncomingRequest(request))
+                    val result = withTimeoutOrNull(APPROVAL_TIMEOUT_MS) { decision.await() }
+                    decisions.remove(request.id)
+                    _pendingRequests.update { list -> list.filterNot { it.id == request.id } }
+                    result
+                }
 
                 when (approved) {
                     true -> {
@@ -367,6 +439,205 @@ class KirimlyServerManager(
                         HttpStatusCode.RequestTimeout,
                         UploadRequestResponse(approved = false, requestId = request.id, message = "Waktu persetujuan habis")
                     )
+                }
+            }
+
+            // ---------------- Resumable upload v2 ----------------
+
+            post("/api/upload/init") {
+                val body = try {
+                    call.receive<UploadInitBody>()
+                } catch (e: Exception) {
+                    null
+                }
+                val approval = body?.let { approvedSessions[it.token] }
+                if (body == null || approval == null || approval.isExpired()) {
+                    call.respond(HttpStatusCode.Unauthorized, SimpleResponse(ok = false, message = "Sesi upload tidak valid"))
+                    return@post
+                }
+                val expected = approval.request.files.getOrNull(body.index)
+                if (expected == null) {
+                    call.respond(HttpStatusCode.BadRequest, SimpleResponse(ok = false, message = "Indeks file tidak dikenal"))
+                    return@post
+                }
+                // Same file again (reconnect): hand back the existing session and its offset.
+                val fileKey = body.token + "#" + body.index
+                uploadsByFile[fileKey]?.let { existingId -> uploads[existingId] }?.let { existing ->
+                    existing.lastActivity = System.currentTimeMillis()
+                    call.respond(
+                        UploadInitResponse(
+                            uploadId = existing.id,
+                            offset = existing.written,
+                            chunkSize = CHUNK_SIZE,
+                            encrypted = existing.encrypted,
+                            serverPublicKey = if (existing.encrypted) TransferCrypto.encodePublicKey(serverKeyPair.public) else null
+                        )
+                    )
+                    return@post
+                }
+                val name = NetworkUtils.sanitizeFileName(body.name.ifBlank { expected.name })
+                val relativeDir = ResumableUploadStore.sanitizeRelativeDir(
+                    body.relativePath?.substringBeforeLast('/', "")
+                )
+                val mime = body.mimeType.takeIf { it.isNotBlank() && it != "application/octet-stream" }
+                    ?: expected.mimeType.takeIf { it != "application/octet-stream" }
+                    ?: NetworkUtils.resolveMimeType(name)
+                val key = body.publicKey?.let { encoded ->
+                    try {
+                        TransferCrypto.deriveKey(serverKeyPair.private, TransferCrypto.decodePublicKey(encoded), fileKey)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                if (body.publicKey != null && key == null) {
+                    call.respond(HttpStatusCode.BadRequest, SimpleResponse(ok = false, message = "Kunci enkripsi tidak valid"))
+                    return@post
+                }
+                val target = try {
+                    withContext(Dispatchers.IO) { ResumableUploadStore.createTarget(appContext, name, mime, relativeDir) }
+                } catch (e: Exception) {
+                    call.respond(HttpStatusCode.InternalServerError, SimpleResponse(ok = false, message = e.message ?: "Penyimpanan penuh"))
+                    return@post
+                }
+                val displayPath = if (relativeDir.isBlank()) name else "$relativeDir/$name"
+                val session = UploadSession(
+                    id = UUID.randomUUID().toString(),
+                    token = body.token,
+                    index = body.index,
+                    fileName = name,
+                    mimeType = mime,
+                    size = body.size,
+                    relativeDir = relativeDir,
+                    peerName = approval.request.deviceName,
+                    expectedSha256 = body.sha256?.lowercase(),
+                    key = key,
+                    target = target,
+                    trackId = tracker.start(displayPath, TransferDirection.RECEIVED, approval.request.deviceName, body.size, key != null)
+                )
+                uploads[session.id] = session
+                uploadsByFile[fileKey] = session.id
+                broadcast(WsMessage(type = "upload-started", fileName = name))
+                call.respond(
+                    UploadInitResponse(
+                        uploadId = session.id,
+                        offset = 0L,
+                        chunkSize = CHUNK_SIZE,
+                        encrypted = key != null,
+                        serverPublicKey = if (key != null) TransferCrypto.encodePublicKey(serverKeyPair.public) else null
+                    )
+                )
+            }
+
+            get("/api/upload/status") {
+                val session = call.request.queryParameters["id"]?.let { uploads[it] }
+                if (session == null) {
+                    call.respond(HttpStatusCode.NotFound, UploadChunkResponse(offset = 0L, message = "Sesi tidak ditemukan"))
+                    return@get
+                }
+                session.lastActivity = System.currentTimeMillis()
+                call.respond(UploadChunkResponse(offset = session.written))
+            }
+
+            post("/api/upload/chunk") {
+                val session = call.request.queryParameters["id"]?.let { uploads[it] }
+                val offset = call.request.queryParameters["offset"]?.toLongOrNull()
+                if (session == null || offset == null) {
+                    call.respond(HttpStatusCode.NotFound, UploadChunkResponse(offset = 0L, message = "Sesi tidak ditemukan"))
+                    return@post
+                }
+                val declared = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+                if (declared != null && declared > MAX_CHUNK_BYTES) {
+                    call.respond(HttpStatusCode.PayloadTooLarge, UploadChunkResponse(offset = session.written, message = "Chunk terlalu besar"))
+                    return@post
+                }
+                val raw = try {
+                    call.receive<ByteArray>()
+                } catch (e: Exception) {
+                    call.respond(HttpStatusCode.BadRequest, UploadChunkResponse(offset = session.written, message = "Chunk terputus"))
+                    return@post
+                }
+                session.mutex.withLock {
+                    session.lastActivity = System.currentTimeMillis()
+                    if (offset != session.written) {
+                        call.respond(HttpStatusCode.Conflict, UploadChunkResponse(offset = session.written, message = "Offset tidak cocok"))
+                        return@withLock
+                    }
+                    val plain = try {
+                        session.key?.let { TransferCrypto.decrypt(it, raw) } ?: raw
+                    } catch (e: Exception) {
+                        call.respond(HttpStatusCode.UnprocessableEntity, UploadChunkResponse(offset = session.written, message = "Dekripsi gagal"))
+                        return@withLock
+                    }
+                    val claimed = call.request.headers[CHUNK_SHA_HEADER]?.lowercase()
+                    if (claimed != null && claimed != TransferCrypto.sha256Hex(plain)) {
+                        call.respond(HttpStatusCode.UnprocessableEntity, UploadChunkResponse(offset = session.written, message = "Checksum chunk tidak cocok"))
+                        return@withLock
+                    }
+                    if (session.size >= 0 && session.written + plain.size > session.size) {
+                        call.respond(HttpStatusCode.BadRequest, UploadChunkResponse(offset = session.written, message = "Melebihi ukuran file"))
+                        return@withLock
+                    }
+                    try {
+                        withContext(Dispatchers.IO) {
+                            ResumableUploadStore.writeAt(appContext, session.target, session.written, plain, plain.size)
+                        }
+                    } catch (e: Exception) {
+                        call.respond(HttpStatusCode.InternalServerError, UploadChunkResponse(offset = session.written, message = e.message ?: "Gagal menulis"))
+                        return@withLock
+                    }
+                    session.digest.update(plain)
+                    session.written += plain.size
+                    tracker.update(session.trackId, session.written)
+                    call.respond(UploadChunkResponse(offset = session.written))
+                }
+            }
+
+            post("/api/upload/complete") {
+                val session = call.request.queryParameters["id"]?.let { uploads[it] }
+                if (session == null) {
+                    call.respond(HttpStatusCode.NotFound, UploadCompleteResponse(ok = false, message = "Sesi tidak ditemukan"))
+                    return@post
+                }
+                val body = try {
+                    call.receive<UploadCompleteBody>()
+                } catch (e: Exception) {
+                    UploadCompleteBody()
+                }
+                session.mutex.withLock {
+                    if (session.size >= 0 && session.written != session.size) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            UploadCompleteResponse(ok = false, message = "Baru ${session.written} dari ${session.size} byte")
+                        )
+                        return@withLock
+                    }
+                    val actual = TransferCrypto.toHex((session.digest.clone() as java.security.MessageDigest).digest())
+                    val expectedHash = (body.sha256 ?: session.expectedSha256)?.lowercase()
+                    if (expectedHash != null && expectedHash != actual) {
+                        uploads.remove(session.id)
+                        uploadsByFile.remove(session.token + "#" + session.index)
+                        withContext(Dispatchers.IO) { ResumableUploadStore.discard(appContext, session.target) }
+                        tracker.finish(session.trackId, TransferStatus.FAILED, session.written, "SHA-256 tidak cocok")
+                        _events.tryEmit(ServerEvent.FileFailed(session.fileName, "SHA-256 tidak cocok"))
+                        call.respond(HttpStatusCode.UnprocessableEntity, UploadCompleteResponse(ok = false, sha256 = actual, message = "SHA-256 tidak cocok, file dibuang"))
+                        return@withLock
+                    }
+                    val result = try {
+                        withContext(Dispatchers.IO) { finalizeUpload(session) }
+                    } catch (e: Exception) {
+                        tracker.finish(session.trackId, TransferStatus.FAILED, session.written, e.message ?: "Gagal menyimpan")
+                        call.respond(HttpStatusCode.InternalServerError, UploadCompleteResponse(ok = false, message = e.message ?: "Gagal menyimpan"))
+                        return@withLock
+                    }
+                    uploads.remove(session.id)
+                    uploadsByFile.remove(session.token + "#" + session.index)
+                    approvedSessions[session.token]?.let { approval ->
+                        if (approval.received.incrementAndGet() >= approval.request.files.size) approvedSessions.remove(session.token)
+                    }
+                    tracker.finish(session.trackId, TransferStatus.COMPLETED, session.written)
+                    _events.tryEmit(ServerEvent.FileReceived(result, session.peerName))
+                    broadcast(WsMessage(type = "upload-finished", fileName = result, progress = 1f))
+                    call.respond(UploadCompleteResponse(ok = true, savedName = result, sha256 = actual))
                 }
             }
 
@@ -547,6 +818,72 @@ class KirimlyServerManager(
                 }
             }
 
+            get("/api/download-all") {
+                if (!call.requirePin()) return@get
+                val items = _sharedItems.value
+                if (items.isEmpty()) {
+                    call.respond(HttpStatusCode.NotFound, SimpleResponse(ok = false, message = "Tidak ada file dibagikan"))
+                    return@get
+                }
+                val downloader = describeUserAgent(call.request.headers[HttpHeaders.UserAgent].orEmpty())
+                val total = items.sumOf { it.sizeBytes.coerceAtLeast(0L) }
+                val trackId = tracker.start("Kirimly-${items.size}-item.zip", TransferDirection.SENT, downloader, total)
+                call.response.header(HttpHeaders.ContentDisposition, contentDisposition("Kirimly-${System.currentTimeMillis() / 1000}.zip"))
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                var sent = 0L
+                var ok = false
+                try {
+                    call.respondOutputStream(contentType = ContentType.Application.Zip, status = HttpStatusCode.OK) {
+                        withContext(Dispatchers.IO) {
+                            ZipOutputStream(this@respondOutputStream).use { zip ->
+                                zip.setLevel(Deflater.NO_COMPRESSION)
+                                val used = HashSet<String>()
+                                var textIndex = 1
+                                for (item in items) {
+                                    val entryName = uniqueEntryName(
+                                        used,
+                                        when (item) {
+                                            is SharedFile -> item.displayName
+                                            is SharedText -> "teks-${textIndex++}.txt"
+                                        }
+                                    )
+                                    zip.putNextEntry(ZipEntry(entryName))
+                                    when (item) {
+                                        is SharedText -> {
+                                            val bytes = item.text.toByteArray(Charsets.UTF_8)
+                                            zip.write(bytes)
+                                            sent += bytes.size
+                                        }
+                                        is SharedFile -> {
+                                            appContext.contentResolver.openInputStream(item.uri)?.use { input ->
+                                                val buffer = ByteArray(NetworkUtils.BUFFER_SIZE * 8)
+                                                while (true) {
+                                                    val read = input.read(buffer)
+                                                    if (read == -1) break
+                                                    zip.write(buffer, 0, read)
+                                                    sent += read
+                                                    tracker.update(trackId, sent)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    zip.closeEntry()
+                                }
+                                zip.finish()
+                            }
+                        }
+                    }
+                    ok = true
+                } finally {
+                    if (ok) {
+                        tracker.finish(trackId, TransferStatus.COMPLETED, sent)
+                        _events.tryEmit(ServerEvent.FileDownloaded("${items.size} item (ZIP)", downloader))
+                    } else {
+                        tracker.finish(trackId, TransferStatus.FAILED, sent, "Unduhan ZIP terputus")
+                    }
+                }
+            }
+
             webSocket("/ws") {
                 val provided = call.request.queryParameters["pin"]
                 if (_pinRequired.value && provided != _pin.value) {
@@ -619,6 +956,7 @@ class KirimlyServerManager(
 
     /** Validates the PIN for this call and responds with 401/429 when invalid. */
     private suspend fun ApplicationCall.requirePin(): Boolean {
+        if (isTrusted(request.headers[DEVICE_HEADER])) return true
         val remote = request.origin.remoteHost
         return when (checkPin(remote, request.headers[PIN_HEADER] ?: request.queryParameters["pin"])) {
             PinCheck.OK -> true
@@ -630,6 +968,105 @@ class KirimlyServerManager(
                 respond(HttpStatusCode.TooManyRequests, SimpleResponse(ok = false, message = "Terlalu banyak percobaan. Tunggu 30 detik."))
                 false
             }
+        }
+    }
+
+    private fun isTrusted(deviceId: String?): Boolean =
+        !deviceId.isNullOrBlank() && trustedDevices.containsKey(deviceId)
+
+    /** Publishes a finished v2 upload, optionally converts HEIC, records history. Returns the saved name. */
+    private suspend fun finalizeUpload(session: UploadSession): String {
+        var name = ResumableUploadStore.publish(appContext, session.target, session.mimeType)
+        var uri = session.target.uri
+        var mime = session.mimeType
+        var size = session.written
+        if (convertHeic && ResumableUploadStore.isHeic(session.mimeType, name)) {
+            ResumableUploadStore.convertHeicToJpeg(appContext, uri, name, session.relativeDir)?.let { (newUri, newName, newSize) ->
+                uri = newUri
+                name = newName
+                mime = "image/jpeg"
+                if (newSize > 0) size = newSize
+            }
+        }
+        val shownName = if (session.relativeDir.isBlank()) name else session.relativeDir + "/" + name
+        dao.insert(
+            TransferRecordEntity.forFile(
+                fileName = shownName,
+                sizeBytes = size,
+                mimeType = mime,
+                direction = TransferDirection.RECEIVED,
+                peerName = session.peerName,
+                uri = uri.toString()
+            )
+        )
+        return shownName
+    }
+
+    /** Drops uploads idle for too long (client vanished) so their pending files do not linger. */
+    private fun startJanitor() {
+        janitorJob?.cancel()
+        janitorJob = scope.launch {
+            while (true) {
+                delay(JANITOR_INTERVAL_MS)
+                val cutoff = System.currentTimeMillis() - UPLOAD_IDLE_TIMEOUT_MS
+                uploads.values.filter { it.lastActivity < cutoff }.forEach { stale ->
+                    uploads.remove(stale.id)
+                    uploadsByFile.remove(stale.token + "#" + stale.index)
+                    ResumableUploadStore.discard(appContext, stale.target)
+                    tracker.finish(stale.trackId, TransferStatus.FAILED, stale.written, "Koneksi terputus terlalu lama")
+                }
+                approvedSessions.entries.removeAll { it.value.isExpired() }
+            }
+        }
+    }
+
+    /** Keeps the advertised IP current when Wi-Fi or the default network changes. */
+    private fun registerNetworkCallback() {
+        if (networkCallback != null) return
+        val manager = appContext.getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = onNetworkChanged()
+            override fun onLost(network: Network) = onNetworkChanged()
+            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) = onNetworkChanged()
+        }
+        try {
+            manager.registerNetworkCallback(NetworkRequest.Builder().build(), callback)
+            networkCallback = callback
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val callback = networkCallback ?: return
+        networkCallback = null
+        try {
+            appContext.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun onNetworkChanged() {
+        scope.launch {
+            delay(800L)
+            val before = (_serverState.value as? ServerState.Running)?.ip
+            refreshAddress()
+            val after = (_serverState.value as? ServerState.Running)?.ip
+            if (before != null && after != null && before != after) {
+                broadcast(WsMessage(type = "address-changed", message = after))
+                _events.tryEmit(ServerEvent.AddressChanged(after))
+            }
+        }
+    }
+
+    private fun uniqueEntryName(used: MutableSet<String>, name: String): String {
+        if (used.add(name)) return name
+        val base = name.substringBeforeLast('.', name)
+        val ext = name.substringAfterLast('.', "")
+        var index = 2
+        while (true) {
+            val candidate = if (ext.isEmpty()) "$base ($index)" else "$base ($index).$ext"
+            if (used.add(candidate)) return candidate
+            index++
         }
     }
 
@@ -741,6 +1178,13 @@ class KirimlyServerManager(
         const val PORT_RANGE = 20
         const val PIN_HEADER = "X-Kirimly-Pin"
         const val TOKEN_HEADER = "X-Kirimly-Token"
+        const val DEVICE_HEADER = "X-Kirimly-Device"
+        const val CHUNK_SHA_HEADER = "X-Chunk-Sha256"
+        const val CHUNK_SIZE = 4 * 1024 * 1024
+        private const val MAX_CHUNK_BYTES = 17L * 1024L * 1024L
+        private const val UPLOAD_IDLE_TIMEOUT_MS = 30L * 60L * 1000L
+        private const val JANITOR_INTERVAL_MS = 60_000L
+        val FEATURES = listOf("chunked-v2", "e2e-ecdh-aesgcm", "zip", "folders", "trusted-devices")
         const val NO_NETWORK_IP = "0.0.0.0"
         const val APPROVAL_TIMEOUT_MS = 55_000L
         private const val CONNECTION_IDLE_TIMEOUT_SECONDS = 180

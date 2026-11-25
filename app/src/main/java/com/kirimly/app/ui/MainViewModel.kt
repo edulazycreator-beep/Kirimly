@@ -28,6 +28,7 @@ import com.kirimly.app.data.model.UserPreferences
 import com.kirimly.app.data.prefs.UserPreferencesRepository
 import com.kirimly.app.network.NetworkUtils
 import com.kirimly.app.network.QrCodeGenerator
+import com.kirimly.app.network.SharedFileCache
 import com.kirimly.app.network.ServerEvent
 import com.kirimly.app.service.TransferForegroundService
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +71,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val peers: StateFlow<List<PeerDevice>> = container.nsdManager.peers
     val isDiscovering: StateFlow<Boolean> = container.nsdManager.isDiscovering
     val hotspotState: StateFlow<HotspotState> = container.hotspotManager.state
+    val unreachablePeers: StateFlow<List<String>> = container.nsdManager.unreachablePeers
+
+    /** URL encoded in the Safari QR; optionally carries the PIN in the fragment (never sent to the server). */
+    val qrServerUrl: StateFlow<String?> = combine(serverState, pin, preferences) { state, currentPin, prefs ->
+        val running = state as? ServerState.Running
+        when {
+            running == null || !running.hasNetwork -> null
+            prefs.pinInQr && prefs.pinRequired -> running.url + "/#pin=" + currentPin
+            else -> running.url
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Bonjour name Apple devices can open instead of the IP. */
+    val localHostUrl: StateFlow<String?> = serverState
+        .map { state -> (state as? ServerState.Running)?.let { "http://kirimly.local:${it.port}" } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val queueTotalBytes: StateFlow<Long> = sharedItems
         .map { items -> items.sumOf { it.sizeBytes.coerceAtLeast(0L) } }
@@ -137,6 +154,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     is ServerEvent.TextReceived -> _messages.trySend("Teks dari ${event.from} disalin ke clipboard")
                     is ServerEvent.FileDownloaded -> _messages.trySend("${event.by} mengunduh ${event.fileName}")
                     is ServerEvent.IncomingRequest -> Unit
+                    is ServerEvent.TrustedAutoAccepted ->
+                        _messages.trySend("Kiriman dari ${event.request.deviceName} diterima otomatis (perangkat tepercaya)")
+                    is ServerEvent.AddressChanged ->
+                        _messages.trySend("Alamat berubah ke ${event.ip} — pindai ulang QR di perangkat lain")
                 }
             }
         }
@@ -182,8 +203,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { container.preferences.setPinRequired(required) }
     }
 
-    fun respondToRequest(requestId: String, accept: Boolean) {
-        serverManager.respondToRequest(requestId, accept)
+    fun respondToRequest(requestId: String, accept: Boolean, trust: Boolean = false) {
+        serverManager.respondToRequest(requestId, accept, trust)
+    }
+
+    /** Starts the server once per app session when the user enabled automatic start. */
+    private var autoStartAttempted = false
+
+    fun maybeAutoStartServer() {
+        if (autoStartAttempted) return
+        autoStartAttempted = true
+        val prefs = loadedPreferences.value ?: return
+        if (prefs.autoStartServer && serverState.value is ServerState.Stopped) startServer()
+    }
+
+    fun setAutoStartServer(enabled: Boolean) {
+        viewModelScope.launch { container.preferences.setAutoStartServer(enabled) }
+    }
+
+    fun setPinInQr(enabled: Boolean) {
+        viewModelScope.launch { container.preferences.setPinInQr(enabled) }
+    }
+
+    fun setConvertHeic(enabled: Boolean) {
+        viewModelScope.launch { container.preferences.setConvertHeic(enabled) }
+    }
+
+    fun removeTrustedDevice(id: String) {
+        viewModelScope.launch { container.preferences.removeTrustedDevice(id) }
+        _messages.trySend("Perangkat dihapus dari daftar tepercaya")
     }
 
     fun setQrMode(mode: QrMode) {
@@ -236,24 +284,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ------------------------------------------------------------------ queue
 
-    fun addUris(uris: List<Uri>) {
+    /**
+     * Adds files to the queue. Picker Uris get a persistable grant; share-sheet Uris (or any Uri
+     * whose grant cannot be persisted) are copied into the app cache so they stay readable.
+     */
+    fun addUris(uris: List<Uri>, fromShareSheet: Boolean = false) {
         if (uris.isEmpty()) return
         viewModelScope.launch {
             val app = getApplication<Application>()
+            var copied = 0
             val items = withContext(Dispatchers.IO) {
                 uris.mapNotNull { uri ->
-                    try {
+                    val persisted = !fromShareSheet && try {
                         app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        true
                     } catch (_: Exception) {
+                        false
                     }
-                    NetworkUtils.querySharedFile(app, uri)
+                    val meta = NetworkUtils.querySharedFile(app, uri) ?: return@mapNotNull null
+                    if (persisted || SharedFileCache.isCached(app, uri)) {
+                        meta
+                    } else {
+                        SharedFileCache.copyIntoCache(app, meta)?.also { copied++ } ?: meta
+                    }
                 }
             }
             if (items.isEmpty()) {
                 _messages.trySend("File tidak dapat dibaca")
             } else {
                 serverManager.addSharedItems(items)
-                _messages.trySend("${items.size} file ditambahkan ke antrean")
+                val note = if (copied > 0) " ($copied disalin agar tetap bisa diakses)" else ""
+                _messages.trySend("${items.size} file ditambahkan ke antrean$note")
             }
         }
     }
@@ -291,7 +352,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             Intent.ACTION_SEND -> {
                 val stream = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
                 if (stream != null) {
-                    addUris(listOf(stream))
+                    addUris(listOf(stream), fromShareSheet = true)
                 } else {
                     val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
                     val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
@@ -303,7 +364,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             Intent.ACTION_SEND_MULTIPLE -> {
                 val streams = IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
-                if (!streams.isNullOrEmpty()) addUris(streams.toList())
+                if (!streams.isNullOrEmpty()) addUris(streams.toList(), fromShareSheet = true)
                 _navigation.trySend(ROUTE_SEND)
             }
         }
@@ -334,7 +395,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         if (result.fileCount > 0) add("${result.fileCount} file")
                         if (result.textCount > 0) add("${result.textCount} teks")
                     }.joinToString(" & ")
-                    "Terkirim ke ${peer.name}: $parts"
+                    "Terkirim ke ${peer.name}: $parts" + if (result.encrypted) " • terenkripsi" else ""
                 }
                 PeerSendResult.PinRejected -> "PIN salah untuk ${peer.name}"
                 PeerSendResult.Declined -> "${peer.name} menolak kiriman"

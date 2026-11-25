@@ -1,5 +1,8 @@
 package com.kirimly.app.ui.screens
 
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.RectangleShape
 import android.content.ActivityNotFoundException
@@ -96,6 +99,8 @@ fun ReceiveScreen(
     val hotspotState by viewModel.hotspotState.collectAsStateWithLifecycle()
     val wifiPayload by viewModel.wifiPayload.collectAsStateWithLifecycle()
     val transfers by viewModel.activeTransfers.collectAsStateWithLifecycle()
+    val qrServerUrl by viewModel.qrServerUrl.collectAsStateWithLifecycle()
+    val localHostUrl by viewModel.localHostUrl.collectAsStateWithLifecycle()
 
     val hotspotPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -156,7 +161,7 @@ fun ReceiveScreen(
                 QrDisplayCard(
                     mode = qrMode,
                     onModeChange = viewModel::setQrMode,
-                    serverUrl = running?.takeIf { it.hasNetwork }?.url,
+                    serverUrl = qrServerUrl,
                     wifiPayload = wifiPayload,
                     serverCaption = "Pindai dengan Kamera iPhone, lalu buka di Safari.\nPerangkat harus di jaringan Wi-Fi yang sama.",
                     wifiCaption = "Pindai dengan Kamera iPhone untuk bergabung ke hotspot, lalu beralih ke QR URL Safari."
@@ -189,6 +194,12 @@ fun ReceiveScreen(
             if (running != null && !running.hasNetwork) {
                 item(key = "noNetwork") {
                     InfoBanner("Tidak ada jaringan Wi-Fi atau hotspot terdeteksi. Sambungkan ke Wi-Fi atau aktifkan hotspot lokal.")
+                }
+            }
+
+            if (running != null && running.hasNetwork) {
+                item(key = "connectionNotes") {
+                    ConnectionNotes(localHostUrl = localHostUrl, onCopy = viewModel::copyToClipboard)
                 }
             }
 
@@ -578,6 +589,47 @@ private fun openHotspotSettings(context: Context) {
             return
         } catch (_: ActivityNotFoundException) {
         } catch (_: SecurityException) {
+        }
+    }
+}
+
+@Composable
+private fun ConnectionNotes(localHostUrl: String?, onCopy: (String) -> Unit) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
+    ) {
+        if (localHostUrl != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Alamat untuk iPhone, iPad & Mac", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(localHostUrl, style = MaterialTheme.typography.titleSmall)
+                }
+                IconButton(onClick = { onCopy(localHostUrl) }) {
+                    Icon(Icons.Rounded.ContentCopy, contentDescription = "Salin alamat kirimly.local")
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+        Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(16.dp)) {
+            Icon(
+                imageVector = Icons.Rounded.Shield,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.size(12.dp))
+            Text(
+                "Android ke Android terenkripsi end-to-end. Koneksi Safari memakai HTTP lokal tanpa enkripsi: " +
+                    "gunakan di jaringan yang kamu percayai, atau hotspot lokal dari HP ini.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

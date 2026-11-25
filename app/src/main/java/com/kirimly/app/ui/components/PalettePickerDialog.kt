@@ -1,5 +1,8 @@
 package com.kirimly.app.ui.components
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -69,6 +72,10 @@ fun PalettePickerSheet(
     onPaletteChange: (AppPalette) -> Unit,
     onNicknameChange: (String) -> Unit,
     onPinRequiredChange: (Boolean) -> Unit,
+    onAutoStartChange: (Boolean) -> Unit,
+    onPinInQrChange: (Boolean) -> Unit,
+    onConvertHeicChange: (Boolean) -> Unit,
+    onRemoveTrusted: (String) -> Unit,
     onShowTutorial: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -175,6 +182,59 @@ fun PalettePickerSheet(
                     Switch(checked = preferences.pinRequired, onCheckedChange = onPinRequiredChange)
                 }
             }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionLabel("Transfer")
+                SettingSwitch(
+                    title = "Server otomatis aktif",
+                    body = "Nyalakan server setiap kali Kirimly dibuka, jadi perangkat ini langsung siap menerima.",
+                    checked = preferences.autoStartServer,
+                    onCheckedChange = onAutoStartChange
+                )
+                SettingSwitch(
+                    title = "Sertakan PIN di QR",
+                    body = "Pemindai QR langsung masuk tanpa mengetik PIN. Siapa pun yang memotret layar ini juga bisa masuk.",
+                    checked = preferences.pinInQr,
+                    onCheckedChange = onPinInQrChange
+                )
+                SettingSwitch(
+                    title = "Ubah foto HEIC ke JPG",
+                    body = "Foto iPhone disimpan sebagai JPG agar terbuka di semua aplikasi (Android 9+). File HEIC asli dihapus.",
+                    checked = preferences.convertHeic,
+                    onCheckedChange = onConvertHeicChange
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionLabel("Perangkat tepercaya")
+                if (preferences.trustedDevices.isEmpty()) {
+                    Text(
+                        "Belum ada. Centang \"Percayai perangkat ini\" saat menerima kiriman agar perangkat itu tidak perlu PIN lagi.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    preferences.trustedDevices.forEach { device ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
+                                .padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
+                        ) {
+                            Icon(Icons.Rounded.VerifiedUser, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Text(
+                                device.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 12.dp)
+                            )
+                            TextButton(onClick = { onRemoveTrusted(device.id) }) { Text("Hapus") }
+                        }
+                    }
+                }
+            }
+
             OutlinedButton(onClick = onShowTutorial, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Rounded.School, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
@@ -237,5 +297,23 @@ private fun PaletteRow(palette: AppPalette, selected: Boolean, dark: Boolean, on
         } else {
             Box(modifier = Modifier.size(26.dp).background(Color.Transparent))
         }
+    }
+}
+
+@Composable
+private fun SettingSwitch(title: String, body: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .padding(vertical = 4.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.size(12.dp))
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

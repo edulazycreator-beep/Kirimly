@@ -1,5 +1,9 @@
 package com.kirimly.app.ui.components
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,9 +46,10 @@ import kotlinx.coroutines.delay
 @Composable
 fun ApprovalBottomSheet(
     request: PendingTransferRequest,
-    onAccept: () -> Unit,
+    onAccept: (trust: Boolean) -> Unit,
     onDecline: () -> Unit
 ) {
+    var trust by remember(request.id) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var now by remember(request.id) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(request.id) {
@@ -174,6 +179,25 @@ fun ApprovalBottomSheet(
                 )
             }
 
+            if (!request.deviceId.isNullOrBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(value = trust, role = Role.Checkbox, onValueChange = { trust = it })
+                ) {
+                    Checkbox(checked = trust, onCheckedChange = null)
+                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                        Text("Percayai perangkat ini", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Kiriman berikutnya dari ${request.deviceName} diterima otomatis tanpa PIN.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = onDecline,
@@ -182,7 +206,7 @@ fun ApprovalBottomSheet(
                         .height(52.dp)
                 ) { Text("Tolak") }
                 Button(
-                    onClick = onAccept,
+                    onClick = { onAccept(trust) },
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp)

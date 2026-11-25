@@ -16,6 +16,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import com.kirimly.app.data.model.QrMode
 import com.kirimly.app.data.model.ServerState
 import com.kirimly.app.ui.components.AnimatedKirimlyMark
 import android.content.pm.PackageManager
@@ -123,6 +124,9 @@ fun KirimlyApp(viewModel: MainViewModel) {
         if (needed.isNotEmpty()) permissionLauncher.launch(needed.toTypedArray())
     }
 
+    // ---- Server on by default while the app is open (can be turned off in settings) ----
+    LaunchedEffect(Unit) { viewModel.maybeAutoStartServer() }
+
     // ---- One-shot UI events ----
     LaunchedEffect(Unit) {
         viewModel.messages.collect { message ->
@@ -204,7 +208,18 @@ fun KirimlyApp(viewModel: MainViewModel) {
                 exitTransition = { fadeOut() }
             ) {
                 composable(MainViewModel.ROUTE_SEND) {
-                    SendScreen(viewModel = viewModel, onOpenSettings = { showSettings = true })
+                    SendScreen(
+                        viewModel = viewModel,
+                        onOpenSettings = { showSettings = true },
+                        onOpenReceive = {
+                            viewModel.setQrMode(QrMode.WIFI_HOTSPOT)
+                            navController.navigate(MainViewModel.ROUTE_RECEIVE) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    )
                 }
                 composable(MainViewModel.ROUTE_RECEIVE) {
                     ReceiveScreen(viewModel = viewModel, onOpenSettings = { showSettings = true })
@@ -220,7 +235,7 @@ fun KirimlyApp(viewModel: MainViewModel) {
     pendingRequests.firstOrNull()?.let { request ->
         ApprovalBottomSheet(
             request = request,
-            onAccept = { viewModel.respondToRequest(request.id, true) },
+            onAccept = { trust -> viewModel.respondToRequest(request.id, true, trust) },
             onDecline = { viewModel.respondToRequest(request.id, false) }
         )
     }
@@ -254,6 +269,10 @@ fun KirimlyApp(viewModel: MainViewModel) {
             onPaletteChange = viewModel::setPalette,
             onNicknameChange = viewModel::setNickname,
             onPinRequiredChange = viewModel::setPinRequired,
+            onAutoStartChange = viewModel::setAutoStartServer,
+            onPinInQrChange = viewModel::setPinInQr,
+            onConvertHeicChange = viewModel::setConvertHeic,
+            onRemoveTrusted = viewModel::removeTrustedDevice,
             onShowTutorial = {
                 showSettings = false
                 viewModel.replayOnboarding()

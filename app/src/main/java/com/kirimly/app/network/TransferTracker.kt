@@ -23,7 +23,13 @@ class TransferTracker(private val scope: CoroutineScope) {
     private val lastEmit = ConcurrentHashMap<String, Long>()
     private val startClock = ConcurrentHashMap<String, Long>()
 
-    fun start(fileName: String, direction: TransferDirection, peerName: String, totalBytes: Long): String {
+    fun start(
+        fileName: String,
+        direction: TransferDirection,
+        peerName: String,
+        totalBytes: Long,
+        encrypted: Boolean = false
+    ): String {
         val id = UUID.randomUUID().toString()
         startClock[id] = SystemClock.elapsedRealtime()
         lastEmit[id] = 0L
@@ -36,7 +42,8 @@ class TransferTracker(private val scope: CoroutineScope) {
             transferredBytes = 0L,
             bytesPerSecond = 0L,
             status = TransferStatus.IN_PROGRESS,
-            startedAt = System.currentTimeMillis()
+            startedAt = System.currentTimeMillis(),
+            encrypted = encrypted
         )
         _active.update { it + progress }
         return id

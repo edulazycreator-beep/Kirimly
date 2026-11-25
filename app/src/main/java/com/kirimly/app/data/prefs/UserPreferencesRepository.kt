@@ -8,15 +8,18 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.kirimly.app.data.model.AppPalette
 import com.kirimly.app.data.model.ThemeMode
+import com.kirimly.app.data.model.TrustedDevice
 import com.kirimly.app.data.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.io.IOException
+import java.security.SecureRandom
 
 private val Context.kirimlyDataStore: DataStore<Preferences> by preferencesDataStore(name = "kirimly_preferences")
 
@@ -30,6 +33,11 @@ class UserPreferencesRepository(context: Context) {
         val NICKNAME = stringPreferencesKey("device_nickname")
         val PIN_REQUIRED = booleanPreferencesKey("pin_required")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_completed")
+        val AUTO_START = booleanPreferencesKey("auto_start_server")
+        val PIN_IN_QR = booleanPreferencesKey("pin_in_qr")
+        val CONVERT_HEIC = booleanPreferencesKey("convert_heic")
+        val DEVICE_ID = stringPreferencesKey("device_id")
+        val TRUSTED = stringSetPreferencesKey("trusted_devices")
     }
 
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
@@ -42,7 +50,12 @@ class UserPreferencesRepository(context: Context) {
                 palette = AppPalette.fromName(prefs[Keys.PALETTE]),
                 deviceNickname = prefs[Keys.NICKNAME]?.takeIf { it.isNotBlank() } ?: defaultNickname(),
                 pinRequired = prefs[Keys.PIN_REQUIRED] ?: true,
-                onboardingCompleted = prefs[Keys.ONBOARDING_DONE] ?: false
+                onboardingCompleted = prefs[Keys.ONBOARDING_DONE] ?: false,
+                autoStartServer = prefs[Keys.AUTO_START] ?: true,
+                pinInQr = prefs[Keys.PIN_IN_QR] ?: false,
+                convertHeic = prefs[Keys.CONVERT_HEIC] ?: false,
+                deviceId = prefs[Keys.DEVICE_ID].orEmpty(),
+                trustedDevices = decodeTrusted(prefs[Keys.TRUSTED].orEmpty())
             )
         }
         .distinctUntilChanged()
@@ -66,6 +79,41 @@ class UserPreferencesRepository(context: Context) {
         dataStore.edit { it[Keys.PIN_REQUIRED] = required }
     }
 
+    suspend fun setAutoStartServer(enabled: Boolean) {
+        dataStore.edit { it[Keys.AUTO_START] = enabled }
+    }
+
+    suspend fun setPinInQr(enabled: Boolean) {
+        dataStore.edit { it[Keys.PIN_IN_QR] = enabled }
+    }
+
+    suspend fun setConvertHeic(enabled: Boolean) {
+        dataStore.edit { it[Keys.CONVERT_HEIC] = enabled }
+    }
+
+    /** Creates this install's random device id once; used to be recognised as trusted by peers. */
+    suspend fun ensureDeviceId() {
+        dataStore.edit { prefs ->
+            if (prefs[Keys.DEVICE_ID].isNullOrBlank()) prefs[Keys.DEVICE_ID] = newDeviceId()
+        }
+    }
+
+    suspend fun addTrustedDevice(id: String, name: String) {
+        if (id.isBlank()) return
+        dataStore.edit { prefs ->
+            val current = decodeTrusted(prefs[Keys.TRUSTED].orEmpty()).filterNot { it.id == id }
+            val updated = current + TrustedDevice(id, name.take(40), System.currentTimeMillis())
+            prefs[Keys.TRUSTED] = updated.takeLast(MAX_TRUSTED).map(::encodeTrusted).toSet()
+        }
+    }
+
+    suspend fun removeTrustedDevice(id: String) {
+        dataStore.edit { prefs ->
+            val updated = decodeTrusted(prefs[Keys.TRUSTED].orEmpty()).filterNot { it.id == id }
+            prefs[Keys.TRUSTED] = updated.map(::encodeTrusted).toSet()
+        }
+    }
+
     suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { it[Keys.ONBOARDING_DONE] = completed }
     }
@@ -85,7 +133,29 @@ class UserPreferencesRepository(context: Context) {
             palette = AppPalette.MIDNIGHT_MONO,
             deviceNickname = defaultNickname(),
             pinRequired = true,
-            onboardingCompleted = false
+            onboardingCompleted = false,
+            autoStartServer = true,
+            pinInQr = false,
+            convertHeic = false,
+            deviceId = "",
+            trustedDevices = emptyList()
         )
+
+        private const val MAX_TRUSTED = 32
+        private const val SEP = '\u001F'
+
+        private fun newDeviceId(): String {
+            val bytes = ByteArray(16).also { SecureRandom().nextBytes(it) }
+            return bytes.joinToString("") { String.format(java.util.Locale.US, "%02x", it.toInt() and 0xFF) }
+        }
+
+        private fun encodeTrusted(device: TrustedDevice): String =
+            listOf(device.id, device.name.replace(SEP, ' '), device.addedAt.toString()).joinToString(SEP.toString())
+
+        private fun decodeTrusted(raw: Set<String>): List<TrustedDevice> = raw.mapNotNull { entry ->
+            val parts = entry.split(SEP)
+            if (parts.size < 3 || parts[0].isBlank()) null
+            else TrustedDevice(parts[0], parts[1], parts[2].toLongOrNull() ?: 0L)
+        }.sortedBy { it.addedAt }
     }
 }

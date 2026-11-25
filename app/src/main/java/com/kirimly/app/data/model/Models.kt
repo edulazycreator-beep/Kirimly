@@ -111,6 +111,7 @@ data class IncomingFileMeta(
 /** A remote upload request waiting for the user's Accept / Decline decision. */
 data class PendingTransferRequest(
     val id: String,
+    val deviceId: String?,
     val deviceName: String,
     val userAgent: String,
     val remoteAddress: String,
@@ -132,7 +133,8 @@ data class TransferProgress(
     val bytesPerSecond: Long,
     val status: TransferStatus,
     val startedAt: Long,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val encrypted: Boolean = false
 ) {
     val fraction: Float
         get() = when {
@@ -166,7 +168,7 @@ sealed interface HotspotState {
 
 /** Result of sending a queue to a peer Kirimly device. */
 sealed interface PeerSendResult {
-    data class Success(val fileCount: Int, val textCount: Int) : PeerSendResult
+    data class Success(val fileCount: Int, val textCount: Int, val encrypted: Boolean = false) : PeerSendResult
     data object PinRejected : PeerSendResult
     data object Declined : PeerSendResult
     data object Timeout : PeerSendResult
@@ -179,5 +181,17 @@ data class UserPreferences(
     val palette: AppPalette,
     val deviceNickname: String,
     val pinRequired: Boolean,
-    val onboardingCompleted: Boolean
+    val onboardingCompleted: Boolean,
+    val autoStartServer: Boolean,
+    val pinInQr: Boolean,
+    val convertHeic: Boolean,
+    val deviceId: String,
+    val trustedDevices: List<TrustedDevice>
+)
+
+/** A remote device the user chose to trust: it skips the PIN and is accepted automatically. */
+data class TrustedDevice(
+    val id: String,
+    val name: String,
+    val addedAt: Long
 )
