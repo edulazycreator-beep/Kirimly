@@ -886,7 +886,7 @@ class KirimlyServerManager(
 
             webSocket("/ws") {
                 val provided = call.request.queryParameters["pin"]
-                if (_pinRequired.value && provided != _pin.value) {
+                if (_pinRequired.value && provided != _pin.value && !isTrusted(call.request.queryParameters["device"])) {
                     close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "PIN tidak valid"))
                     return@webSocket
                 }
@@ -956,7 +956,7 @@ class KirimlyServerManager(
 
     /** Validates the PIN for this call and responds with 401/429 when invalid. */
     private suspend fun ApplicationCall.requirePin(): Boolean {
-        if (isTrusted(request.headers[DEVICE_HEADER])) return true
+        if (isTrusted(request.headers[DEVICE_HEADER] ?: request.queryParameters["device"])) return true
         val remote = request.origin.remoteHost
         return when (checkPin(remote, request.headers[PIN_HEADER] ?: request.queryParameters["pin"])) {
             PinCheck.OK -> true

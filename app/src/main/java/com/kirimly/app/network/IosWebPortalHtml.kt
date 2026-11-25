@@ -164,6 +164,13 @@ textarea:focus, input.field:focus { border-color: var(--text); }
 .err-text { color: var(--danger); font-size: 13px; min-height: 18px; margin-bottom: 8px; }
 .label { font-size: 13px; color: var(--muted); margin: 0 0 8px; display: block; }
 .footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--hairline); }
+#folderInput { display: none; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.notice { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
+#keepAwake { display: none; }
+label.btn { display: block; text-align: center; }
+.actions .btn { flex: 1; }
+a.btn { text-align: center; text-decoration: none; display: block; }
 </style>
 </head>
 <body>
@@ -187,19 +194,22 @@ textarea:focus, input.field:focus { border-color: var(--text); }
 
   <section class="card">
     <h2>Kirim file ke Android</h2>
-    <p class="sub">Foto, video, dokumen, atau arsip — sebanyak yang kamu mau.</p>
+    <p class="sub">Foto, video, dokumen, arsip, atau satu folder utuh. Di Mac kamu juga bisa menempel gambar dengan Cmd+V.</p>
     <label id="drop" class="drop" for="fileInput">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
       <strong>Pilih file</strong>
       <span>atau seret &amp; lepas di sini</span>
     </label>
     <input id="fileInput" type="file" multiple>
+    <input id="folderInput" type="file" webkitdirectory multiple>
+    <div class="actions"><label for="folderInput" class="btn ghost" role="button" tabindex="0" id="folderBtn">Pilih folder</label></div>
     <ul id="selectedList" class="list"></ul>
     <div id="selectedSummary" class="summary" style="display:none"><span id="selCount"></span><span id="selSize"></span></div>
     <div id="approvalBox" class="status-box"><span class="spinner"></span><span id="approvalText">Menunggu persetujuan di Android…</span></div>
-    <div id="overall" style="display:none; margin-top:12px">
+    <div id="overall" style="display:none; margin-top:14px">
       <div class="prog-meta"><span id="overallLabel">Mengunggah…</span><span id="overallSpeed"></span></div>
       <div class="bar" id="overallBar"><span></span></div>
+      <p id="keepAwake" class="notice">Biarkan layar menyala dan Safari tetap terbuka. Jika koneksi terputus atau layar terkunci, Kirimly melanjutkan dari posisi terakhir saat kamu kembali.</p>
     </div>
     <div class="actions">
       <button id="clearBtn" class="btn ghost" type="button" style="display:none">Bersihkan</button>
@@ -210,12 +220,13 @@ textarea:focus, input.field:focus { border-color: var(--text); }
   <section class="card">
     <h2>Kirim teks atau tautan</h2>
     <p class="sub">Langsung masuk ke clipboard &amp; riwayat Android.</p>
-    <textarea id="textInput" placeholder="Ketik atau tempel teks / URL…"></textarea>
+    <label class="label" for="textInput">Teks atau URL</label>
+    <textarea id="textInput" placeholder="Ketik atau tempel di sini"></textarea>
     <div class="actions"><button id="sendTextBtn" class="btn" type="button">Kirim Teks</button></div>
   </section>
 
   <section class="card">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+    <div class="card-head">
       <div>
         <h2>Dibagikan dari Android</h2>
         <p class="sub" style="margin-bottom:0">Ketuk untuk mengunduh.</p>
@@ -224,38 +235,109 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     </div>
     <ul id="sharedList" class="list"></ul>
     <div id="sharedEmpty" class="empty">Belum ada file yang dibagikan.</div>
+    <div class="actions" id="zipRow" style="display:none"><a id="zipLink" class="btn" href="#">Unduh semua (ZIP)</a></div>
   </section>
 
   <section class="card">
     <label class="label" for="senderName">Nama perangkatmu (opsional)</label>
     <input id="senderName" class="field" type="text" maxlength="40" placeholder="mis. iPhone Rina">
+    <p class="notice">Live Photo terkirim sebagai foto. Foto HEIC dikirim apa adanya; Android bisa mengubahnya ke JPG jika diaktifkan.</p>
   </section>
 
-  <p class="footer">Kirimly • Jaringan lokal, tanpa internet</p>
+  <p class="footer"><span class="dot" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Koneksi lokal tanpa enkripsi (HTTP). Gunakan di jaringan yang kamu percayai.</p>
 </main>
 
-<div id="pinModal" class="modal-back">
+<div id="pinModal" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
   <div class="modal" id="pinCard">
-    <h3>Masukkan PIN</h3>
+    <h3 id="pinTitle">Masukkan PIN</h3>
     <p>Lihat PIN 4 digit di layar Terima pada perangkat Android.</p>
     <div class="pin-inputs">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="1">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="1">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="1">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code" aria-label="Digit PIN 1">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit PIN 2">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit PIN 3">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit PIN 4">
     </div>
-    <div id="pinError" class="err-text"></div>
+    <div id="pinError" class="err-text" role="alert"></div>
     <button id="pinSubmit" class="btn" type="button">Hubungkan</button>
   </div>
 </div>
 
-<div id="toast" class="toast"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
 (function () {
   'use strict';
 
-  var state = { pin: '', info: null, files: [], busy: false, ws: null, wsRetry: null, authed: false };
+  function Sha256() {
+    this.h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+    this.buf = new Uint8Array(64);
+    this.bufLen = 0;
+    this.total = 0;
+    this.w = new Uint32Array(64);
+  }
+  Sha256.K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ]);
+  Sha256.prototype.block = function (d, o) {
+    var w = this.w, h = this.h, K = Sha256.K, i, x, y, t1, t2;
+    for (i = 0; i < 16; i++) {
+      w[i] = (d[o + i * 4] << 24) | (d[o + i * 4 + 1] << 16) | (d[o + i * 4 + 2] << 8) | d[o + i * 4 + 3];
+    }
+    for (i = 16; i < 64; i++) {
+      x = w[i - 15]; y = w[i - 2];
+      w[i] = (w[i - 16] + (((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3)) + w[i - 7] +
+        (((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10))) | 0;
+    }
+    var a = h[0], b = h[1], c = h[2], e4 = h[3], e = h[4], f = h[5], g = h[6], k = h[7];
+    for (i = 0; i < 64; i++) {
+      t1 = (k + (((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7))) +
+        ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+      t2 = ((((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10))) +
+        ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      k = g; g = f; f = e; e = (e4 + t1) | 0; e4 = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    h[0] += a; h[1] += b; h[2] += c; h[3] += e4; h[4] += e; h[5] += f; h[6] += g; h[7] += k;
+  };
+  Sha256.prototype.update = function (bytes) {
+    var len = bytes.length, pos = 0;
+    this.total += len;
+    if (this.bufLen > 0) {
+      var take = Math.min(64 - this.bufLen, len);
+      this.buf.set(bytes.subarray(0, take), this.bufLen);
+      this.bufLen += take; pos = take;
+      if (this.bufLen === 64) { this.block(this.buf, 0); this.bufLen = 0; }
+    }
+    while (pos + 64 <= len) { this.block(bytes, pos); pos += 64; }
+    if (pos < len) { this.buf.set(bytes.subarray(pos), 0); this.bufLen = len - pos; }
+    return this;
+  };
+  Sha256.prototype.hex = function () {
+    var bits = this.total * 8;
+    var pad = new Uint8Array(((this.bufLen < 56) ? 56 : 120) - this.bufLen + 8);
+    pad[0] = 0x80;
+    var hi = Math.floor(bits / 0x100000000), lo = bits >>> 0, n = pad.length;
+    pad[n - 8] = hi >>> 24; pad[n - 7] = hi >>> 16; pad[n - 6] = hi >>> 8; pad[n - 5] = hi;
+    pad[n - 4] = lo >>> 24; pad[n - 3] = lo >>> 16; pad[n - 2] = lo >>> 8; pad[n - 1] = lo;
+    var saveTotal = this.total;
+    this.update(pad);
+    this.total = saveTotal;
+    var out = '';
+    for (var i = 0; i < 8; i++) out += ('00000000' + this.h[i].toString(16)).slice(-8);
+    return out;
+  };
+  Sha256.hexOf = function (bytes) { return new Sha256().update(bytes).hex(); };
+
+
+  var CONCURRENCY = 3;
+  var MAX_RETRIES = 40;
+  var state = { pin: '', info: null, files: [], busy: false, ws: null, wsRetry: null, authed: false, deviceId: '', wakers: [] };
 
   function el(id) { return document.getElementById(id); }
 
@@ -286,7 +368,7 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     t.textContent = msg;
     t.className = 'toast show' + (kind ? ' ' + kind : '');
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.className = 'toast'; }, 2800);
+    toastTimer = setTimeout(function () { t.className = 'toast'; }, 3000);
   }
 
   function guessDevice() {
@@ -308,10 +390,25 @@ textarea:focus, input.field:focus { border-color: var(--text); }
   function storeGet(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
   function storeSet(key, value) { try { window.localStorage.setItem(key, value); } catch (e) { } }
 
+  function makeDeviceId() {
+    var bytes = new Uint8Array(16), out = '';
+    try { window.crypto.getRandomValues(bytes); } catch (e) { for (var i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256); }
+    for (var j = 0; j < 16; j++) out += ('0' + bytes[j].toString(16)).slice(-2);
+    return out;
+  }
+
   function authHeaders(extra) {
     var h = extra || {};
     if (state.pin) h['X-Kirimly-Pin'] = state.pin;
+    if (state.deviceId) h['X-Kirimly-Device'] = state.deviceId;
     return h;
+  }
+
+  function authQuery() {
+    var parts = [];
+    if (state.pin) parts.push('pin=' + encodeURIComponent(state.pin));
+    if (state.deviceId) parts.push('device=' + encodeURIComponent(state.deviceId));
+    return parts.length ? '?' + parts.join('&') : '';
   }
 
   function api(method, path, body) {
@@ -324,6 +421,10 @@ textarea:focus, input.field:focus { border-color: var(--text); }
         return { status: r.status, ok: r.ok, data: data };
       });
     });
+  }
+
+  function hasFeature(name) {
+    return !!(state.info && state.info.features && state.info.features.indexOf(name) >= 0);
   }
 
   /* ---------- PIN ---------- */
@@ -358,48 +459,51 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     });
   });
 
+  function verifyPin(pin, onOk, onFail) {
+    state.pin = pin;
+    api('POST', '/api/verify-pin').then(function (res) {
+      if (res.ok) { storeSet('kirimly_pin', pin); onOk(); }
+      else { state.pin = ''; onFail((res.data && res.data.message) || 'PIN salah, coba lagi.'); }
+    }).catch(function () { state.pin = ''; onFail('Tidak dapat terhubung ke Android.'); });
+  }
+
   function submitPin() {
     var pin = pinInputs.map(function (i) { return i.value; }).join('');
     if (pin.length !== 4) { el('pinError').textContent = 'PIN harus 4 digit.'; return; }
-    state.pin = pin;
-    api('POST', '/api/verify-pin').then(function (res) {
-      if (res.ok) {
-        storeSet('kirimly_pin', pin);
-        hidePin();
-        afterAuth();
-      } else {
-        state.pin = '';
-        var card = el('pinCard');
-        card.classList.remove('shake');
-        void card.offsetWidth;
-        card.classList.add('shake');
-        el('pinError').textContent = (res.data && res.data.message) || 'PIN salah, coba lagi.';
-        pinInputs.forEach(function (i) { i.value = ''; });
-        pinInputs[0].focus();
-      }
-    }).catch(function () { el('pinError').textContent = 'Tidak dapat terhubung ke Android.'; });
+    verifyPin(pin, function () { hidePin(); afterAuth(); }, function (msg) {
+      var card = el('pinCard');
+      card.classList.remove('shake');
+      void card.offsetWidth;
+      card.classList.add('shake');
+      el('pinError').textContent = msg;
+      pinInputs.forEach(function (i) { i.value = ''; });
+      pinInputs[0].focus();
+    });
   }
 
   el('pinSubmit').addEventListener('click', submitPin);
 
   /* ---------- Info & auth ---------- */
+  function pinFromFragment() {
+    var m = /pin=([0-9]{4})/.exec(location.hash || '');
+    if (m) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
+      return m[1];
+    }
+    return '';
+  }
+
   function loadInfo() {
     api('GET', '/api/info').then(function (res) {
       state.info = res.data || {};
       el('deviceName').textContent = state.info.deviceName || 'Android';
       document.title = 'Kirimly • ' + (state.info.deviceName || 'Android');
-      if (state.info.pinRequired) {
-        var saved = storeGet('kirimly_pin');
-        if (saved && saved.length === 4) {
-          state.pin = saved;
-          api('POST', '/api/verify-pin').then(function (r) {
-            if (r.ok) afterAuth(); else { state.pin = ''; showPin(); }
-          }).catch(function () { showPin(); });
-        } else {
-          showPin();
-        }
+      if (!state.info.pinRequired || state.info.trusted) { afterAuth(); return; }
+      var candidate = pinFromFragment() || storeGet('kirimly_pin') || '';
+      if (candidate.length === 4) {
+        verifyPin(candidate, afterAuth, function () { showPin(); });
       } else {
-        afterAuth();
+        showPin();
       }
     }).catch(function () {
       toast('Tidak dapat terhubung ke Android. Pastikan server aktif.', 'err');
@@ -453,6 +557,9 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     var list = el('sharedList');
     list.innerHTML = '';
     el('sharedEmpty').style.display = items.length ? 'none' : 'block';
+    var zipOk = items.length > 1 && hasFeature('zip');
+    el('zipRow').style.display = zipOk ? 'flex' : 'none';
+    if (zipOk) el('zipLink').href = '/api/download-all' + authQuery();
     items.forEach(function (item) {
       var li = document.createElement('li');
       li.className = 'row';
@@ -483,7 +590,7 @@ textarea:focus, input.field:focus { border-color: var(--text); }
         var a = document.createElement('a');
         a.className = 'btn small';
         a.textContent = 'Unduh';
-        a.href = '/api/download/' + encodeURIComponent(item.id) + (state.pin ? '?pin=' + encodeURIComponent(state.pin) : '');
+        a.href = '/api/download/' + encodeURIComponent(item.id) + authQuery();
         a.setAttribute('download', item.name);
         li.appendChild(ico); li.appendChild(meta); li.appendChild(a);
       }
@@ -497,17 +604,17 @@ textarea:focus, input.field:focus { border-color: var(--text); }
   function connectWs() {
     if (state.ws) { try { state.ws.close(); } catch (e) { } }
     var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
-    var url = proto + location.host + '/ws' + (state.pin ? '?pin=' + encodeURIComponent(state.pin) : '');
     var ws;
-    try { ws = new WebSocket(url); } catch (e) { scheduleWs(); return; }
+    try { ws = new WebSocket(proto + location.host + '/ws' + authQuery()); } catch (e) { scheduleWs(); return; }
     state.ws = ws;
     ws.onopen = function () { el('wsDot').className = 'dot on'; };
     ws.onmessage = function (ev) {
       var msg = {};
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       if (msg.type === 'shared-updated') loadShared();
-      if (msg.type === 'pin-changed') handleUnauthorized();
+      if (msg.type === 'pin-changed' && !(state.info && state.info.trusted)) handleUnauthorized();
       if (msg.type === 'server-stopping') toast('Server Android dihentikan.', 'err');
+      if (msg.type === 'address-changed') toast('Alamat Android berubah ke ' + msg.message + '. Pindai ulang QR jika halaman berhenti merespons.', 'err');
     };
     ws.onclose = function () { el('wsDot').className = 'dot'; scheduleWs(); };
     ws.onerror = function () { el('wsDot').className = 'dot'; };
@@ -518,17 +625,43 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     state.wsRetry = setTimeout(function () { if (state.authed) connectWs(); }, 3000);
   }
 
-  /* ---------- File selection ---------- */
-  function addFiles(fileList) {
-    for (var i = 0; i < fileList.length; i++) state.files.push(fileList[i]);
+  /* ---------- File selection (picker, folder, drop, paste) ---------- */
+  function addEntry(file, relPath) {
+    state.files.push({ file: file, rel: relPath || '' });
+  }
+
+  function addFiles(fileList, useRelative) {
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      addEntry(f, useRelative ? (f.webkitRelativePath || '') : '');
+    }
     renderSelected();
+  }
+
+  function walkEntry(entry, prefix, done) {
+    if (entry.isFile) {
+      entry.file(function (f) { addEntry(f, prefix + f.name); done(); }, function () { done(); });
+    } else if (entry.isDirectory) {
+      var reader = entry.createReader(), all = [];
+      var readBatch = function () {
+        reader.readEntries(function (batch) {
+          if (!batch.length) {
+            var left = all.length;
+            if (!left) { done(); return; }
+            all.forEach(function (child) { walkEntry(child, prefix + entry.name + '/', function () { if (--left === 0) done(); }); });
+          } else { all = all.concat(Array.prototype.slice.call(batch)); readBatch(); }
+        }, function () { done(); });
+      };
+      readBatch();
+    } else { done(); }
   }
 
   function renderSelected() {
     var list = el('selectedList');
     list.innerHTML = '';
     var total = 0;
-    state.files.forEach(function (f, idx) {
+    state.files.forEach(function (entry, idx) {
+      var f = entry.file;
       total += f.size;
       var li = document.createElement('li');
       li.className = 'row';
@@ -539,9 +672,10 @@ textarea:focus, input.field:focus { border-color: var(--text); }
       meta.className = 'meta';
       var nm = document.createElement('div');
       nm.className = 'name';
-      nm.textContent = f.name;
+      nm.textContent = entry.rel || f.name;
       var sz = document.createElement('div');
       sz.className = 'size';
+      sz.id = 'size-' + idx;
       sz.textContent = fmtSize(f.size);
       meta.appendChild(nm); meta.appendChild(sz);
       var bar = document.createElement('div');
@@ -553,7 +687,7 @@ textarea:focus, input.field:focus { border-color: var(--text); }
       var rm = document.createElement('button');
       rm.className = 'icon-btn';
       rm.type = 'button';
-      rm.setAttribute('aria-label', 'Hapus');
+      rm.setAttribute('aria-label', 'Hapus ' + f.name);
       rm.textContent = '×';
       rm.disabled = state.busy;
       rm.addEventListener('click', function () {
@@ -572,9 +706,10 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     el('clearBtn').style.display = has && !state.busy ? 'block' : 'none';
   }
 
-  el('fileInput').addEventListener('change', function (e) {
-    addFiles(e.target.files);
-    e.target.value = '';
+  el('fileInput').addEventListener('change', function (e) { addFiles(e.target.files, false); e.target.value = ''; });
+  el('folderInput').addEventListener('change', function (e) { addFiles(e.target.files, true); e.target.value = ''; });
+  el('folderBtn').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el('folderInput').click(); }
   });
 
   var drop = el('drop');
@@ -585,7 +720,35 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     drop.addEventListener(evt, function (e) { e.preventDefault(); drop.classList.remove('drag'); });
   });
   drop.addEventListener('drop', function (e) {
-    if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
+    var dt = e.dataTransfer;
+    if (!dt) return;
+    var items = dt.items ? Array.prototype.slice.call(dt.items) : [];
+    var entries = items.map(function (it) { return it.webkitGetAsEntry ? it.webkitGetAsEntry() : null; }).filter(Boolean);
+    if (entries.length) {
+      var left = entries.length;
+      entries.forEach(function (entry) {
+        walkEntry(entry, '', function () { if (--left === 0) renderSelected(); });
+      });
+    } else if (dt.files) {
+      addFiles(dt.files, false);
+    }
+  });
+
+  document.addEventListener('paste', function (e) {
+    var target = e.target;
+    if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) return;
+    var files = e.clipboardData && e.clipboardData.files;
+    if (!files || !files.length) return;
+    e.preventDefault();
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      var name = f.name && f.name !== 'image.png' ? f.name : 'tempel-' + Date.now() + '-' + (i + 1) + '.' + ((f.type || 'image/png').split('/')[1] || 'png');
+      var renamed = f;
+      try { renamed = new File([f], name, { type: f.type }); } catch (err) { renamed = f; }
+      addEntry(renamed, '');
+    }
+    renderSelected();
+    toast(files.length + ' file ditempel', 'ok');
   });
 
   el('clearBtn').addEventListener('click', function () {
@@ -614,20 +777,157 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     bar.firstChild.style.width = Math.max(0, Math.min(100, pct)) + '%';
   }
 
+  /* Waits ms, but wakes early when the page becomes visible again (screen unlocked). */
+  function pause(ms) {
+    return new Promise(function (resolve) {
+      var timer = setTimeout(finish, ms);
+      function finish() { clearTimeout(timer); state.wakers = state.wakers.filter(function (w) { return w !== finish; }); resolve(); }
+      state.wakers.push(finish);
+    });
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) state.wakers.slice().forEach(function (w) { w(); });
+  });
+
+  function readBlob(blob) {
+    if (blob.arrayBuffer) return blob.arrayBuffer();
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(fr.result); };
+      fr.onerror = function () { reject(fr.error); };
+      fr.readAsArrayBuffer(blob);
+    });
+  }
+
+  function xhrSend(method, url, headers, body, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open(method, url, true);
+      Object.keys(headers).forEach(function (k) { xhr.setRequestHeader(k, headers[k]); });
+      if (onProgress) xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded); };
+      xhr.onload = function () {
+        var data = {};
+        try { data = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch (e) { data = {}; }
+        resolve({ status: xhr.status, data: data });
+      };
+      xhr.onerror = function () { reject(new Error('network')); };
+      xhr.onabort = function () { reject(new Error('abort')); };
+      xhr.ontimeout = function () { reject(new Error('timeout')); };
+      xhr.timeout = 120000;
+      xhr.send(body);
+    });
+  }
+
+  function jsonPost(path, body) {
+    return api('POST', path, body).then(function (res) {
+      if (!res.ok) { var err = new Error((res.data && res.data.message) || ('HTTP ' + res.status)); err.status = res.status; throw err; }
+      return res.data;
+    });
+  }
+
+  /* Resumable upload: init, 4 MB chunks with SHA-256 each, resume from the server offset. */
+  function uploadChunked(entry, index, token, onProgress) {
+    var file = entry.file;
+    var hasher = new Sha256();
+    var hashed = 0;
+    var hashValid = true;
+    var retries = 0;
+    var uploadId = null;
+    var chunkSize = 4 * 1024 * 1024;
+
+    function retryOr(err) {
+      retries++;
+      if (retries > MAX_RETRIES) throw err;
+      var wait = Math.min(1000 * Math.pow(2, Math.min(retries, 4)), 15000);
+      return pause(wait).then(function () {
+        return api('GET', '/api/upload/status?id=' + encodeURIComponent(uploadId)).then(function (res) {
+          if (res.status === 404) throw new Error('Sesi upload kedaluwarsa');
+          return res.data.offset;
+        }, function () { return null; });
+      });
+    }
+
+    function catchUpHash(target) {
+      if (!hashValid || target === hashed) return Promise.resolve();
+      if (target < hashed) { hashValid = false; return Promise.resolve(); }
+      return readBlob(file.slice(hashed, target)).then(function (buf) { hasher.update(new Uint8Array(buf)); hashed = target; });
+    }
+
+    function sendFrom(offset) {
+      if (offset >= file.size) return Promise.resolve();
+      var end = Math.min(offset + chunkSize, file.size);
+      return readBlob(file.slice(offset, end)).then(function (buf) {
+        var bytes = new Uint8Array(buf);
+        var sum = Sha256.hexOf(bytes);
+        var url = '/api/upload/chunk?id=' + encodeURIComponent(uploadId) + '&offset=' + offset;
+        return xhrSend('POST', url, { 'Content-Type': 'application/octet-stream', 'X-Chunk-Sha256': sum }, buf, function (loaded) {
+          onProgress(offset + loaded);
+        }).then(function (res) {
+          if (res.status >= 200 && res.status < 300) {
+            retries = 0;
+            if (hashValid && hashed === offset) { hasher.update(bytes); hashed = end; }
+            onProgress(res.data.offset);
+            return sendFrom(res.data.offset);
+          }
+          if (res.status === 409) return catchUpHash(res.data.offset).then(function () { return sendFrom(res.data.offset); });
+          if (res.status === 404) throw new Error('Sesi upload kedaluwarsa');
+          return retryOr(new Error('HTTP ' + res.status)).then(function (next) { return sendFrom(next === null ? offset : next); });
+        }, function (err) {
+          return retryOr(err).then(function (next) {
+            var resume = next === null ? offset : next;
+            return catchUpHash(resume).then(function () { return sendFrom(resume); });
+          });
+        });
+      });
+    }
+
+    var initBody = {
+      token: token, index: index, name: file.name, size: file.size,
+      mimeType: file.type || 'application/octet-stream', relativePath: entry.rel || null
+    };
+    function init() {
+      return jsonPost('/api/upload/init', initBody).catch(function (err) {
+        if (err.status && err.status < 500) throw err;
+        retries++;
+        if (retries > MAX_RETRIES) throw err;
+        return pause(2000).then(init);
+      });
+    }
+    return init().then(function (res) {
+      uploadId = res.uploadId;
+      chunkSize = res.chunkSize || chunkSize;
+      return catchUpHash(res.offset).then(function () { return sendFrom(res.offset); });
+    }).then(function () {
+      var body = hashValid && hashed === file.size ? { sha256: hasher.hex() } : {};
+      return jsonPost('/api/upload/complete?id=' + encodeURIComponent(uploadId), body);
+    });
+  }
+
+  /* Legacy single-request multipart upload for older Kirimly servers. */
+  function uploadLegacy(entry, index, token, onProgress) {
+    var fd = new FormData();
+    fd.append('file', entry.file, entry.file.name);
+    var url = '/api/upload?token=' + encodeURIComponent(token) + '&index=' + index + '&name=' + encodeURIComponent(entry.file.name);
+    return xhrSend('POST', url, { 'X-Kirimly-Token': token }, fd, onProgress).then(function (res) {
+      if (res.status < 200 || res.status >= 300) throw new Error('HTTP ' + res.status);
+    });
+  }
+
   el('sendBtn').addEventListener('click', function () {
     if (state.busy || !state.files.length) return;
-    if (!state.authed && state.info && state.info.pinRequired) { showPin(); return; }
-    var files = state.files.slice();
+    if (!state.authed && state.info && state.info.pinRequired && !state.info.trusted) { showPin(); return; }
+    var entries = state.files.slice();
     setBusy(true);
     showApproval(true, 'Menunggu persetujuan di ' + ((state.info && state.info.deviceName) || 'Android') + '…');
-    var meta = files.map(function (f) { return { name: f.name, size: f.size, mimeType: f.type || 'application/octet-stream' }; });
-    api('POST', '/api/request-upload', { deviceName: senderName(), files: meta }).then(function (res) {
+    var meta = entries.map(function (en) { return { name: en.file.name, size: en.file.size, mimeType: en.file.type || 'application/octet-stream' }; });
+    api('POST', '/api/request-upload', { deviceName: senderName(), deviceId: state.deviceId, files: meta }).then(function (res) {
       showApproval(false);
       if (res.status === 401) { setBusy(false); handleUnauthorized(); return; }
       if (res.status === 403) { setBusy(false); toast('Permintaan ditolak oleh Android.', 'err'); return; }
       if (res.status === 408) { setBusy(false); toast('Tidak ada respons. Coba lagi.', 'err'); return; }
       if (!res.ok || !res.data.token) { setBusy(false); toast((res.data && res.data.message) || 'Gagal memulai transfer.', 'err'); return; }
-      uploadAll(files, res.data.token);
+      uploadAll(entries, res.data.token);
     }).catch(function () {
       showApproval(false);
       setBusy(false);
@@ -635,71 +935,75 @@ textarea:focus, input.field:focus { border-color: var(--text); }
     });
   });
 
-  function uploadAll(files, token) {
-    var totalBytes = files.reduce(function (s, f) { return s + f.size; }, 0) || 1;
-    var doneBytes = 0;
+  function uploadAll(entries, token) {
+    var chunked = hasFeature('chunked-v2');
+    var totalBytes = entries.reduce(function (s, en) { return s + en.file.size; }, 0) || 1;
+    var progress = entries.map(function () { return 0; });
     var started = Date.now();
-    var failures = 0;
+    var failures = 0, nextIndex = 0, finished = 0;
     el('overall').style.display = 'block';
+    el('keepAwake').style.display = 'block';
     setBar(el('overallBar'), 0);
 
-    function next(i) {
-      if (i >= files.length) {
-        setBar(el('overallBar'), 100, failures ? 'fail' : 'done');
-        el('overallLabel').textContent = failures ? (files.length - failures) + ' dari ' + files.length + ' file terkirim' : 'Semua file terkirim';
-        el('overallSpeed').textContent = '';
-        toast(failures ? 'Sebagian file gagal dikirim.' : 'Berhasil dikirim!', failures ? 'err' : 'ok');
-        state.files = [];
-        setBusy(false);
-        return;
-      }
-      var file = files[i];
-      var bar = el('bar-' + i);
-      el('overallLabel').textContent = 'Mengunggah ' + (i + 1) + ' dari ' + files.length;
-      uploadOne(file, i, token, function (loaded) {
-        var pct = file.size ? (loaded / file.size) * 100 : 100;
-        setBar(bar, pct);
-        var overallLoaded = doneBytes + loaded;
-        setBar(el('overallBar'), (overallLoaded / totalBytes) * 100);
-        var secs = (Date.now() - started) / 1000;
-        if (secs > 0.3) el('overallSpeed').textContent = fmtSpeed(overallLoaded / secs) + ' • ' + Math.round((overallLoaded / totalBytes) * 100) + '%';
-      }).then(function () {
-        setBar(bar, 100, 'done');
-      }, function () {
-        failures++;
-        setBar(bar, 100, 'fail');
-      }).then(function () {
-        doneBytes += file.size;
-        next(i + 1);
-      });
+    function refreshOverall() {
+      var loaded = progress.reduce(function (a, b) { return a + b; }, 0);
+      setBar(el('overallBar'), (loaded / totalBytes) * 100);
+      var secs = (Date.now() - started) / 1000;
+      el('overallLabel').textContent = finished + ' dari ' + entries.length + ' selesai';
+      if (secs > 0.3) el('overallSpeed').textContent = fmtSpeed(loaded / secs) + ' • ' + Math.round((loaded / totalBytes) * 100) + '%';
     }
-    next(0);
-  }
 
-  function uploadOne(file, index, token, onProgress) {
-    return new Promise(function (resolve, reject) {
-      var xhr = new XMLHttpRequest();
-      var url = '/api/upload?token=' + encodeURIComponent(token) + '&index=' + index + '&name=' + encodeURIComponent(file.name);
-      xhr.open('POST', url, true);
-      xhr.setRequestHeader('X-Kirimly-Token', token);
-      xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(Math.min(e.loaded, file.size)); };
-      xhr.onload = function () { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error('HTTP ' + xhr.status)); };
-      xhr.onerror = function () { reject(new Error('network')); };
-      xhr.onabort = function () { reject(new Error('abort')); };
-      var fd = new FormData();
-      fd.append('file', file, file.name);
-      xhr.send(fd);
+    return new Promise(function (resolveAll) {
+      function worker() {
+        if (nextIndex >= entries.length) return Promise.resolve();
+        var i = nextIndex++;
+        var entry = entries[i];
+        var bar = el('bar-' + i);
+        var fn = chunked ? uploadChunked : uploadLegacy;
+        return fn(entry, i, token, function (loaded) {
+          progress[i] = Math.min(loaded, entry.file.size);
+          setBar(bar, entry.file.size ? (progress[i] / entry.file.size) * 100 : 100);
+          refreshOverall();
+        }).then(function () {
+          progress[i] = entry.file.size;
+          setBar(bar, 100, 'done');
+        }, function (err) {
+          failures++;
+          setBar(bar, 100, 'fail');
+          var sz = el('size-' + i);
+          if (sz) sz.textContent = 'Gagal: ' + (err && err.message ? err.message : 'koneksi');
+        }).then(function () {
+          finished++;
+          refreshOverall();
+          return worker();
+        });
+      }
+      var pool = [];
+      for (var w = 0; w < Math.min(CONCURRENCY, entries.length); w++) pool.push(worker());
+      Promise.all(pool).then(resolveAll);
+    }).then(function () {
+      setBar(el('overallBar'), 100, failures ? 'fail' : 'done');
+      el('overallLabel').textContent = failures ? (entries.length - failures) + ' dari ' + entries.length + ' file terkirim' : 'Semua file terkirim';
+      el('overallSpeed').textContent = '';
+      el('keepAwake').style.display = 'none';
+      toast(failures ? 'Sebagian file gagal dikirim.' : 'Berhasil dikirim!', failures ? 'err' : 'ok');
+      state.files = [];
+      setBusy(false);
     });
   }
+
+  window.addEventListener('beforeunload', function (e) {
+    if (state.busy) { e.preventDefault(); e.returnValue = ''; }
+  });
 
   /* ---------- Text ---------- */
   el('sendTextBtn').addEventListener('click', function () {
     var text = el('textInput').value;
     if (!text.trim()) { toast('Teks masih kosong.', 'err'); return; }
-    if (!state.authed && state.info && state.info.pinRequired) { showPin(); return; }
+    if (!state.authed && state.info && state.info.pinRequired && !state.info.trusted) { showPin(); return; }
     var btn = el('sendTextBtn');
     btn.disabled = true;
-    api('POST', '/api/text', { text: text, deviceName: senderName() }).then(function (res) {
+    api('POST', '/api/text', { text: text, deviceName: senderName(), deviceId: state.deviceId }).then(function (res) {
       btn.disabled = false;
       if (res.status === 401) { handleUnauthorized(); return; }
       if (res.ok) { el('textInput').value = ''; toast('Teks terkirim & disalin di Android', 'ok'); }
@@ -708,6 +1012,8 @@ textarea:focus, input.field:focus { border-color: var(--text); }
   });
 
   /* ---------- Boot ---------- */
+  state.deviceId = storeGet('kirimly_device') || '';
+  if (!state.deviceId) { state.deviceId = makeDeviceId(); storeSet('kirimly_device', state.deviceId); }
   var savedName = storeGet('kirimly_sender');
   if (savedName) el('senderName').value = savedName;
   el('senderName').addEventListener('change', function () { storeSet('kirimly_sender', el('senderName').value.trim()); });
