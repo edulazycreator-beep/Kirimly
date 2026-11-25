@@ -126,6 +126,9 @@ class TransferForegroundService : Service() {
         requestObserverJob = serviceScope.launch {
             manager.pendingRequests.collect { requests -> syncRequestNotifications(requests) }
         }
+        serviceScope.launch {
+            manager.idleTimeouts.collect { stopServer() }
+        }
     }
 
     private fun updateStatusNotification(state: ServerState, transfers: List<TransferProgress>) {

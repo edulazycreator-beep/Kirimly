@@ -112,7 +112,8 @@ class PeerTransferClient(
         peer: PeerDevice,
         pin: String?,
         items: List<SharedItem>,
-        senderName: String
+        senderName: String,
+        onVerificationCode: (String?) -> Unit = {}
     ): PeerSendResult = withContext(Dispatchers.IO) {
         val files = items.filterIsInstance<SharedFile>()
         val texts = items.filterIsInstance<SharedText>()
@@ -121,7 +122,12 @@ class PeerTransferClient(
         var sentTexts = 0
         val info = fetchInfo(peer.host, peer.port)
         val chunked = info?.features?.contains("chunked-v2") == true
-        val encrypted = chunked && info?.features?.contains("e2e-ecdh-aesgcm") == true
+        val serverKey = info?.publicKey
+        val encrypted = chunked && info?.features?.contains("e2e-ecdh-aesgcm") == true && serverKey != null
+        // One ephemeral key pair per send: both sides derive per-file keys and the same 6-digit code.
+        val sessionKeys = if (encrypted) TransferCrypto.generateKeyPair() else null
+        val clientKey = sessionKeys?.let { TransferCrypto.encodePublicKey(it.public) }
+        if (clientKey != null && serverKey != null) onVerificationCode(TransferCrypto.verificationCode(serverKey, clientKey))
         try {
             if (files.isNotEmpty()) {
                 val response = client.post("$base/api/request-upload") {
@@ -131,6 +137,7 @@ class PeerTransferClient(
                         UploadRequestBody(
                             deviceName = senderName,
                             deviceId = deviceId.ifBlank { null },
+                            publicKey = clientKey,
                             files = files.map { FileMetaDto(it.displayName, it.sizeBytes, it.mimeType) }
                         )
                     )
@@ -151,6 +158,7 @@ class PeerTransferClient(
                 }
                 val approval = response.body<UploadRequestResponse>()
                 val token = approval.token
+                onVerificationCode(null)
                 if (!approval.approved || token.isNullOrBlank()) return@withContext PeerSendResult.Declined
 
                 val gate = Semaphore(PARALLEL_FILES)
@@ -158,7 +166,12 @@ class PeerTransferClient(
                     files.mapIndexed { index, file ->
                         async {
                             gate.withPermit {
-                                if (chunked) uploadChunked(base, token, index, file, peer.name, encrypted)
+                                if (chunked) {
+                                    val key = if (sessionKeys != null && serverKey != null) {
+                                        TransferCrypto.deriveKey(sessionKeys.private, TransferCrypto.decodePublicKey(serverKey), "$token#$index")
+                                    } else null
+                                    uploadChunked(base, token, index, file, peer.name, key)
+                                }
                                 else uploadLegacy(base, token, index, file, peer.name)
                             }
                         }
@@ -186,6 +199,8 @@ class PeerTransferClient(
             }
         } catch (e: Exception) {
             PeerSendResult.Failed(e.message ?: "Koneksi ke ${peer.name} gagal")
+        } finally {
+            onVerificationCode(null)
         }
     }
 
@@ -246,12 +261,11 @@ class PeerTransferClient(
         index: Int,
         file: SharedFile,
         peerName: String,
-        encrypt: Boolean
+        key: SecretKeySpec?
     ): Boolean {
-        val trackId = tracker.start(file.displayName, TransferDirection.SENT, peerName, file.sizeBytes, encrypt)
+        val trackId = tracker.start(file.displayName, TransferDirection.SENT, peerName, file.sizeBytes, key != null)
         val reader = ChunkReader(context, file)
         try {
-            val keyPair = if (encrypt) TransferCrypto.generateKeyPair() else null
             val init = withRetry {
                 val response = client.post("$base/api/upload/init") {
                     identify()
@@ -262,18 +276,14 @@ class PeerTransferClient(
                             index = index,
                             name = file.displayName,
                             size = file.sizeBytes,
-                            mimeType = file.mimeType,
-                            publicKey = keyPair?.let { TransferCrypto.encodePublicKey(it.public) }
+                            mimeType = file.mimeType
                         )
                     )
                 }
                 if (!response.status.isSuccess()) throw IOException("Init gagal (${response.status.value})")
                 response.body<UploadInitResponse>()
             }
-            val key: SecretKeySpec? = if (keyPair != null && init.encrypted && init.serverPublicKey != null) {
-                TransferCrypto.deriveKey(keyPair.private, TransferCrypto.decodePublicKey(init.serverPublicKey), "$token#$index")
-            } else null
-            if (encrypt && key == null) throw IOException("Peer menolak enkripsi")
+            if (key != null && !init.encrypted) throw IOException("Peer menolak enkripsi")
 
             val chunkSize = init.chunkSize.coerceIn(256 * 1024, 8 * 1024 * 1024)
             val buffer = ByteArray(chunkSize)

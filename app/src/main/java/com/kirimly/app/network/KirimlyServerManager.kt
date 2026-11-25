@@ -4,6 +4,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
+import com.kirimly.app.data.db.ApprovedTokenEntity
+import com.kirimly.app.data.db.UploadSessionDao
+import com.kirimly.app.data.db.UploadSessionEntity
+import com.kirimly.app.data.model.ConnectedBrowser
+import com.kirimly.app.util.ThumbnailLoader
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.websocket.DefaultWebSocketServerSession
+import javax.crypto.spec.SecretKeySpec
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
@@ -99,6 +107,7 @@ sealed interface ServerEvent {
     data class FileDownloaded(val fileName: String, val by: String) : ServerEvent
     data class TrustedAutoAccepted(val request: PendingTransferRequest) : ServerEvent
     data class AddressChanged(val ip: String) : ServerEvent
+    data class BrowserOfferResult(val browserName: String, val accepted: Boolean) : ServerEvent
 }
 
 /**
@@ -110,7 +119,9 @@ class KirimlyServerManager(
     private val dao: TransferDao,
     private val tracker: TransferTracker,
     private val scope: CoroutineScope,
-    private val preferences: UserPreferencesRepository
+    private val preferences: UserPreferencesRepository,
+    private val sessionDao: UploadSessionDao,
+    private val isAppInForeground: () -> Boolean
 ) {
 
     private val jsonCodec = Json {
@@ -151,6 +162,26 @@ class KirimlyServerManager(
     @Volatile
     private var convertHeic: Boolean = false
 
+    @Volatile
+    private var idleStopMinutes: Int = 15
+
+    @Volatile
+    private var ownDeviceId: String = ""
+
+    @Volatile
+    private var lastRequestAt: Long = System.currentTimeMillis()
+
+    private val _idleTimeouts = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** Emits when the server has been idle long enough (app in background) to be stopped. */
+    val idleTimeouts: SharedFlow<Unit> = _idleTimeouts.asSharedFlow()
+
+    private val browserSessions = ConcurrentHashMap<String, DefaultWebSocketServerSession>()
+    private val _browsers = MutableStateFlow<List<ConnectedBrowser>>(emptyList())
+
+    /** Safari / browser tabs with the portal open right now. */
+    val browsers: StateFlow<List<ConnectedBrowser>> = _browsers.asStateFlow()
+
     /** Server half of the ECDH exchange; regenerated each time the server starts. */
     @Volatile
     private var serverKeyPair: KeyPair = TransferCrypto.generateKeyPair()
@@ -179,6 +210,7 @@ class KirimlyServerManager(
     private data class ApprovedSession(
         val request: PendingTransferRequest,
         val expiresAt: Long,
+        val clientPublicKey: String? = null,
         val received: AtomicInteger = AtomicInteger(0)
     ) {
         fun isExpired(): Boolean = System.currentTimeMillis() > expiresAt
@@ -194,6 +226,8 @@ class KirimlyServerManager(
         deviceName = prefs.deviceNickname.ifBlank { "Android" }
         _pinRequired.value = prefs.pinRequired
         convertHeic = prefs.convertHeic
+        idleStopMinutes = prefs.idleStopMinutes
+        ownDeviceId = prefs.deviceId
         trustedDevices = prefs.trustedDevices.associate { it.id to it.name }
     }
 
@@ -272,6 +306,8 @@ class KirimlyServerManager(
             serverKeyPair = TransferCrypto.generateKeyPair()
             withContext(Dispatchers.IO) { server.start(wait = false) }
             engine = server
+            lastRequestAt = System.currentTimeMillis()
+            withContext(Dispatchers.IO) { restorePersisted() }
             startJanitor()
             registerNetworkCallback()
             mdnsResponder.start()
@@ -296,10 +332,12 @@ class KirimlyServerManager(
         janitorJob = null
         unregisterNetworkCallback()
         mdnsResponder.stop()
+        // Uploads stay on disk and in the database; they resume when the server starts again.
         uploads.values.forEach { session ->
-            ResumableUploadStore.discard(appContext, session.target)
-            tracker.finish(session.trackId, TransferStatus.FAILED, session.written, "Server dihentikan")
+            tracker.finish(session.trackId, TransferStatus.FAILED, session.written, "Dijeda — lanjut saat server aktif")
         }
+        browserSessions.clear()
+        _browsers.value = emptyList()
         uploads.clear()
         uploadsByFile.clear()
         _pendingRequests.value = emptyList()
@@ -333,6 +371,9 @@ class KirimlyServerManager(
             allowHeader(DEVICE_HEADER)
             allowHeader(CHUNK_SHA_HEADER)
         }
+        intercept(ApplicationCallPipeline.Plugins) {
+            lastRequestAt = System.currentTimeMillis()
+        }
         install(WebSockets) {
             pingPeriodMillis = 15_000L
             timeoutMillis = 30_000L
@@ -363,6 +404,8 @@ class KirimlyServerManager(
                         pinRequired = _pinRequired.value,
                         sharedCount = _sharedItems.value.size,
                         features = FEATURES,
+                        publicKey = TransferCrypto.encodePublicKey(serverKeyPair.public),
+                        deviceId = ownDeviceId.ifBlank { null },
                         trusted = isTrusted(call.request.headers[DEVICE_HEADER])
                     )
                 )
@@ -406,7 +449,15 @@ class KirimlyServerManager(
                         )
                     },
                     createdAt = now,
-                    expiresAt = now + APPROVAL_TIMEOUT_MS
+                    expiresAt = now + APPROVAL_TIMEOUT_MS,
+                    verificationCode = body.publicKey?.let { clientKey ->
+                        try {
+                            TransferCrypto.decodePublicKey(clientKey)
+                            TransferCrypto.verificationCode(TransferCrypto.encodePublicKey(serverKeyPair.public), clientKey)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
                 )
                 val approved: Boolean? = if (isTrusted(claimedDeviceId)) {
                     _events.tryEmit(ServerEvent.TrustedAutoAccepted(request))
@@ -425,10 +476,13 @@ class KirimlyServerManager(
                 when (approved) {
                     true -> {
                         val token = UUID.randomUUID().toString()
-                        approvedSessions[token] = ApprovedSession(
+                        val approval = ApprovedSession(
                             request = request,
-                            expiresAt = System.currentTimeMillis() + SESSION_TTL_MS
+                            expiresAt = System.currentTimeMillis() + SESSION_TTL_MS,
+                            clientPublicKey = body.publicKey
                         )
+                        approvedSessions[token] = approval
+                        persistToken(token, approval)
                         call.respond(UploadRequestResponse(approved = true, token = token, requestId = request.id))
                     }
                     false -> call.respond(
@@ -482,14 +536,14 @@ class KirimlyServerManager(
                 val mime = body.mimeType.takeIf { it.isNotBlank() && it != "application/octet-stream" }
                     ?: expected.mimeType.takeIf { it != "application/octet-stream" }
                     ?: NetworkUtils.resolveMimeType(name)
-                val key = body.publicKey?.let { encoded ->
+                val key = (body.publicKey ?: approval.clientPublicKey)?.let { encoded ->
                     try {
                         TransferCrypto.deriveKey(serverKeyPair.private, TransferCrypto.decodePublicKey(encoded), fileKey)
                     } catch (e: Exception) {
                         null
                     }
                 }
-                if (body.publicKey != null && key == null) {
+                if ((body.publicKey ?: approval.clientPublicKey) != null && key == null) {
                     call.respond(HttpStatusCode.BadRequest, SimpleResponse(ok = false, message = "Kunci enkripsi tidak valid"))
                     return@post
                 }
@@ -515,6 +569,7 @@ class KirimlyServerManager(
                     trackId = tracker.start(displayPath, TransferDirection.RECEIVED, approval.request.deviceName, body.size, key != null)
                 )
                 uploads[session.id] = session
+                persistSession(session)
                 uploadsByFile[fileKey] = session.id
                 broadcast(WsMessage(type = "upload-started", fileName = name))
                 call.respond(
@@ -614,6 +669,7 @@ class KirimlyServerManager(
                     val actual = TransferCrypto.toHex((session.digest.clone() as java.security.MessageDigest).digest())
                     val expectedHash = (body.sha256 ?: session.expectedSha256)?.lowercase()
                     if (expectedHash != null && expectedHash != actual) {
+                        forgetSession(session.id)
                         uploads.remove(session.id)
                         uploadsByFile.remove(session.token + "#" + session.index)
                         withContext(Dispatchers.IO) { ResumableUploadStore.discard(appContext, session.target) }
@@ -629,10 +685,14 @@ class KirimlyServerManager(
                         call.respond(HttpStatusCode.InternalServerError, UploadCompleteResponse(ok = false, message = e.message ?: "Gagal menyimpan"))
                         return@withLock
                     }
+                    forgetSession(session.id)
                     uploads.remove(session.id)
                     uploadsByFile.remove(session.token + "#" + session.index)
                     approvedSessions[session.token]?.let { approval ->
-                        if (approval.received.incrementAndGet() >= approval.request.files.size) approvedSessions.remove(session.token)
+                        if (approval.received.incrementAndGet() >= approval.request.files.size) {
+                            approvedSessions.remove(session.token)
+                            scope.launch(Dispatchers.IO) { sessionDao.deleteToken(session.token) }
+                        }
                     }
                     tracker.finish(session.trackId, TransferStatus.COMPLETED, session.written)
                     _events.tryEmit(ServerEvent.FileReceived(result, session.peerName))
@@ -890,19 +950,53 @@ class KirimlyServerManager(
                     close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "PIN tidak valid"))
                     return@webSocket
                 }
+                val browserId = UUID.randomUUID().toString()
+                val browserName = call.request.queryParameters["name"]?.trim()?.take(40)?.ifBlank { null }
+                    ?: describeUserAgent(call.request.headers[HttpHeaders.UserAgent].orEmpty())
+                browserSessions[browserId] = this
+                _browsers.update { it + ConnectedBrowser(browserId, browserName, call.request.origin.remoteHost, System.currentTimeMillis()) }
                 send(Frame.Text(jsonCodec.encodeToString(WsMessage.serializer(), WsMessage(type = "hello", message = deviceName))))
                 val forwarder = launch {
                     wsBroadcast.collect { message -> send(Frame.Text(message)) }
                 }
                 try {
                     for (frame in incoming) {
-                        if (frame is Frame.Text && frame.readText() == "ping") {
+                        if (frame !is Frame.Text) continue
+                        val text = frame.readText()
+                        if (text == "ping") {
                             send(Frame.Text(jsonCodec.encodeToString(WsMessage.serializer(), WsMessage(type = "pong"))))
+                            continue
+                        }
+                        val message = try {
+                            jsonCodec.decodeFromString(WsMessage.serializer(), text)
+                        } catch (e: Exception) {
+                            null
+                        } ?: continue
+                        when (message.type) {
+                            "offer-accepted" -> _events.tryEmit(ServerEvent.BrowserOfferResult(browserName, true))
+                            "offer-declined" -> _events.tryEmit(ServerEvent.BrowserOfferResult(browserName, false))
                         }
                     }
                 } finally {
                     forwarder.cancel()
+                    browserSessions.remove(browserId)
+                    _browsers.update { list -> list.filterNot { it.id == browserId } }
+                    lastRequestAt = System.currentTimeMillis()
                 }
+            }
+
+            get("/api/thumbnail/{id}") {
+                if (!call.requirePin()) return@get
+                val item = _sharedItems.value.firstOrNull { it.id == call.parameters["id"] } as? SharedFile
+                val bytes = item?.let { file ->
+                    withContext(Dispatchers.IO) { ThumbnailLoader.loadJpeg(appContext, file.uri, file.mimeType, THUMBNAIL_PX) }
+                }
+                if (bytes == null) {
+                    call.respond(HttpStatusCode.NotFound, SimpleResponse(ok = false, message = "Tidak ada pratinjau"))
+                    return@get
+                }
+                call.response.header(HttpHeaders.CacheControl, "private, max-age=3600")
+                call.respondBytes(bytes, ContentType.Image.JPEG)
             }
         }
     }
@@ -971,6 +1065,172 @@ class KirimlyServerManager(
         }
     }
 
+    /** Sends the current queue to one connected browser tab, which shows an accept/decline prompt. */
+    fun offerToBrowser(browserId: String): Boolean {
+        val session = browserSessions[browserId] ?: return false
+        val items = _sharedItems.value
+        if (items.isEmpty()) return false
+        val message = WsMessage(type = "offer", message = deviceName, items = items.map { it.toDto() })
+        scope.launch {
+            try {
+                session.send(Frame.Text(jsonCodec.encodeToString(WsMessage.serializer(), message)))
+            } catch (_: Exception) {
+            }
+        }
+        return true
+    }
+
+    private fun SharedItem.toDto(): SharedItemDto = when (this) {
+        is SharedFile -> SharedItemDto(id = id, type = "file", name = displayName, size = sizeBytes, mimeType = mimeType)
+        is SharedText -> SharedItemDto(id = id, type = "text", name = displayName, size = sizeBytes, mimeType = mimeType, text = text)
+    }
+
+    private fun checkIdle() {
+        val minutes = idleStopMinutes
+        if (minutes <= 0 || engine == null) return
+        val busy = uploads.isNotEmpty() || _pendingRequests.value.isNotEmpty() || browserSessions.isNotEmpty() ||
+            tracker.active.value.any { !it.isFinished }
+        if (busy || isAppInForeground()) {
+            if (busy) lastRequestAt = System.currentTimeMillis()
+            return
+        }
+        if (System.currentTimeMillis() - lastRequestAt >= minutes * 60_000L) {
+            _idleTimeouts.tryEmit(Unit)
+        }
+    }
+
+    // ---------------- persistence of resumable uploads ----------------
+
+    private suspend fun persistSession(session: UploadSession) {
+        try {
+            sessionDao.upsertSession(
+                UploadSessionEntity(
+                    id = session.id,
+                    token = session.token,
+                    fileIndex = session.index,
+                    fileName = session.fileName,
+                    mimeType = session.mimeType,
+                    size = session.size,
+                    relativeDir = session.relativeDir,
+                    peerName = session.peerName,
+                    expectedSha256 = session.expectedSha256,
+                    keyB64 = session.key?.let { android.util.Base64.encodeToString(it.encoded, android.util.Base64.NO_WRAP) },
+                    targetUri = session.target.uri.toString(),
+                    legacyPath = session.target.legacyFile?.absolutePath,
+                    initialName = session.target.initialDisplayName,
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun forgetSession(id: String) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                sessionDao.deleteSession(id)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun persistToken(token: String, approval: ApprovedSession) {
+        val dto = ApprovedTokenDto(
+            requestId = approval.request.id,
+            deviceId = approval.request.deviceId,
+            deviceName = approval.request.deviceName,
+            clientPublicKey = approval.clientPublicKey,
+            files = approval.request.files.map { FileMetaDto(it.name, it.sizeBytes, it.mimeType) }
+        )
+        scope.launch(Dispatchers.IO) {
+            try {
+                sessionDao.upsertToken(
+                    ApprovedTokenEntity(token, jsonCodec.encodeToString(ApprovedTokenDto.serializer(), dto), approval.expiresAt)
+                )
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** Reloads approvals and half-finished uploads after a restart; the digest is rebuilt from disk. */
+    private suspend fun restorePersisted() {
+        val now = System.currentTimeMillis()
+        try {
+            sessionDao.liveTokens(now).forEach { entity ->
+                if (approvedSessions.containsKey(entity.token)) return@forEach
+                val dto = try {
+                    jsonCodec.decodeFromString(ApprovedTokenDto.serializer(), entity.requestJson)
+                } catch (e: Exception) {
+                    null
+                } ?: return@forEach
+                approvedSessions[entity.token] = ApprovedSession(
+                    request = PendingTransferRequest(
+                        id = dto.requestId,
+                        deviceId = dto.deviceId,
+                        deviceName = dto.deviceName,
+                        userAgent = "",
+                        remoteAddress = "",
+                        files = dto.files.map { IncomingFileMeta(it.name, it.size, it.mimeType) },
+                        createdAt = now,
+                        expiresAt = entity.expiresAt
+                    ),
+                    expiresAt = entity.expiresAt,
+                    clientPublicKey = dto.clientPublicKey
+                )
+            }
+            sessionDao.allSessions().forEach { entity ->
+                if (uploads.containsKey(entity.id)) return@forEach
+                val target = UploadTarget(
+                    uri = Uri.parse(entity.targetUri),
+                    legacyFile = entity.legacyPath?.let { java.io.File(it) },
+                    initialDisplayName = entity.initialName
+                )
+                val key = entity.keyB64?.let { SecretKeySpec(android.util.Base64.decode(it, android.util.Base64.NO_WRAP), "AES") }
+                val displayPath = if (entity.relativeDir.isBlank()) entity.fileName else entity.relativeDir + "/" + entity.fileName
+                val session = UploadSession(
+                    id = entity.id,
+                    token = entity.token,
+                    index = entity.fileIndex,
+                    fileName = entity.fileName,
+                    mimeType = entity.mimeType,
+                    size = entity.size,
+                    relativeDir = entity.relativeDir,
+                    peerName = entity.peerName,
+                    expectedSha256 = entity.expectedSha256,
+                    key = key,
+                    target = target,
+                    trackId = tracker.start(displayPath, TransferDirection.RECEIVED, entity.peerName, entity.size, key != null)
+                )
+                val restored = try {
+                    val input = target.legacyFile?.inputStream() ?: appContext.contentResolver.openInputStream(target.uri)
+                    input?.use { stream ->
+                        val buffer = ByteArray(64 * 1024)
+                        var total = 0L
+                        while (true) {
+                            val read = stream.read(buffer)
+                            if (read == -1) break
+                            session.digest.update(buffer, 0, read)
+                            total += read
+                        }
+                        total
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+                if (restored == null) {
+                    sessionDao.deleteSession(entity.id)
+                    tracker.finish(session.trackId, TransferStatus.FAILED, 0L, "File sementara hilang")
+                    return@forEach
+                }
+                session.written = restored
+                tracker.update(session.trackId, restored)
+                uploads[session.id] = session
+                uploadsByFile[session.token + "#" + session.index] = session.id
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     private fun isTrusted(deviceId: String?): Boolean =
         !deviceId.isNullOrBlank() && trustedDevices.containsKey(deviceId)
 
@@ -1010,12 +1270,15 @@ class KirimlyServerManager(
                 delay(JANITOR_INTERVAL_MS)
                 val cutoff = System.currentTimeMillis() - UPLOAD_IDLE_TIMEOUT_MS
                 uploads.values.filter { it.lastActivity < cutoff }.forEach { stale ->
+                    forgetSession(stale.id)
                     uploads.remove(stale.id)
                     uploadsByFile.remove(stale.token + "#" + stale.index)
                     ResumableUploadStore.discard(appContext, stale.target)
                     tracker.finish(stale.trackId, TransferStatus.FAILED, stale.written, "Koneksi terputus terlalu lama")
                 }
                 approvedSessions.entries.removeAll { it.value.isExpired() }
+                sessionDao.deleteExpiredTokens(System.currentTimeMillis())
+                checkIdle()
             }
         }
     }
@@ -1184,6 +1447,7 @@ class KirimlyServerManager(
         private const val MAX_CHUNK_BYTES = 17L * 1024L * 1024L
         private const val UPLOAD_IDLE_TIMEOUT_MS = 30L * 60L * 1000L
         private const val JANITOR_INTERVAL_MS = 60_000L
+        private const val THUMBNAIL_PX = 240
         val FEATURES = listOf("chunked-v2", "e2e-ecdh-aesgcm", "zip", "folders", "trusted-devices")
         const val NO_NETWORK_IP = "0.0.0.0"
         const val APPROVAL_TIMEOUT_MS = 55_000L

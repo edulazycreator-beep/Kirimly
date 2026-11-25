@@ -14,8 +14,10 @@ android {
         applicationId = "com.kirimly.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // CI run number keeps every build installable over the previous one.
+        val ciRun = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+        versionCode = 100 + ciRun
+        versionName = "1.2.$ciRun"
 
         vectorDrawables {
             useSupportLibrary = true

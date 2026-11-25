@@ -106,6 +106,16 @@ class MainActivity : ComponentActivity() {
         viewModel.handleShareIntent(intent)
     }
 
+    override fun onStart() {
+        super.onStart()
+        (application as KirimlyApplication).container.appInForeground.value = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        (application as KirimlyApplication).container.appInForeground.value = false
+    }
+
     override fun onResume() {
         super.onResume()
         viewModel.refreshAddress()

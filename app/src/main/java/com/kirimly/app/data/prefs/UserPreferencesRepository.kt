@@ -1,5 +1,6 @@
 package com.kirimly.app.data.prefs
 
+import androidx.datastore.preferences.core.intPreferencesKey
 import android.content.Context
 import android.os.Build
 import androidx.datastore.core.DataStore
@@ -38,6 +39,7 @@ class UserPreferencesRepository(context: Context) {
         val CONVERT_HEIC = booleanPreferencesKey("convert_heic")
         val DEVICE_ID = stringPreferencesKey("device_id")
         val TRUSTED = stringSetPreferencesKey("trusted_devices")
+        val IDLE_STOP = intPreferencesKey("idle_stop_minutes")
     }
 
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
@@ -55,7 +57,8 @@ class UserPreferencesRepository(context: Context) {
                 pinInQr = prefs[Keys.PIN_IN_QR] ?: false,
                 convertHeic = prefs[Keys.CONVERT_HEIC] ?: false,
                 deviceId = prefs[Keys.DEVICE_ID].orEmpty(),
-                trustedDevices = decodeTrusted(prefs[Keys.TRUSTED].orEmpty())
+                trustedDevices = decodeTrusted(prefs[Keys.TRUSTED].orEmpty()),
+                idleStopMinutes = prefs[Keys.IDLE_STOP] ?: 15
             )
         }
         .distinctUntilChanged()
@@ -81,6 +84,10 @@ class UserPreferencesRepository(context: Context) {
 
     suspend fun setAutoStartServer(enabled: Boolean) {
         dataStore.edit { it[Keys.AUTO_START] = enabled }
+    }
+
+    suspend fun setIdleStopMinutes(minutes: Int) {
+        dataStore.edit { it[Keys.IDLE_STOP] = minutes.coerceIn(0, 240) }
     }
 
     suspend fun setPinInQr(enabled: Boolean) {
@@ -138,7 +145,8 @@ class UserPreferencesRepository(context: Context) {
             pinInQr = false,
             convertHeic = false,
             deviceId = "",
-            trustedDevices = emptyList()
+            trustedDevices = emptyList(),
+            idleStopMinutes = 15
         )
 
         private const val MAX_TRUSTED = 32

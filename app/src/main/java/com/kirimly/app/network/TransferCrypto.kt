@@ -64,6 +64,16 @@ object TransferCrypto {
         return cipher.doFinal(data, IV_BYTES, data.size - IV_BYTES)
     }
 
+    /** Six-digit code from both public keys (order-independent), shown on both screens as "123 456". */
+    fun verificationCode(publicKeyA: String, publicKeyB: String): String {
+        val (first, second) = if (publicKeyA <= publicKeyB) publicKeyA to publicKeyB else publicKeyB to publicKeyA
+        val digest = MessageDigest.getInstance("SHA-256").digest((first + "|" + second).toByteArray(Charsets.UTF_8))
+        val value = ((digest[0].toLong() and 0xFF) shl 24) or ((digest[1].toLong() and 0xFF) shl 16) or
+            ((digest[2].toLong() and 0xFF) shl 8) or (digest[3].toLong() and 0xFF)
+        val code = (value % 1_000_000L).toString().padStart(6, '0')
+        return code.substring(0, 3) + " " + code.substring(3)
+    }
+
     fun sha256Hex(bytes: ByteArray, length: Int = bytes.size): String {
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update(bytes, 0, length)

@@ -10,7 +10,10 @@ import androidx.core.content.IntentCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kirimly.app.KirimlyApplication
+import androidx.core.content.FileProvider
 import com.kirimly.app.data.model.AppPalette
+import com.kirimly.app.data.model.ConnectedBrowser
+import com.kirimly.app.util.CrashLogger
 import com.kirimly.app.data.model.HistoryFilter
 import com.kirimly.app.data.model.HotspotState
 import com.kirimly.app.data.model.PeerDevice
@@ -72,6 +75,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isDiscovering: StateFlow<Boolean> = container.nsdManager.isDiscovering
     val hotspotState: StateFlow<HotspotState> = container.hotspotManager.state
     val unreachablePeers: StateFlow<List<String>> = container.nsdManager.unreachablePeers
+    val browsers: StateFlow<List<ConnectedBrowser>> = serverManager.browsers
+
+    /** Code to compare with the receiver's approval sheet while an encrypted send waits. */
+    private val _verificationCode = MutableStateFlow<String?>(null)
+    val verificationCode: StateFlow<String?> = _verificationCode.asStateFlow()
+
+    private val _crashLogCount = MutableStateFlow(0)
+    val crashLogCount: StateFlow<Int> = _crashLogCount.asStateFlow()
 
     /** URL encoded in the Safari QR; optionally carries the PIN in the fragment (never sent to the server). */
     val qrServerUrl: StateFlow<String?> = combine(serverState, pin, preferences) { state, currentPin, prefs ->
@@ -156,6 +167,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     is ServerEvent.IncomingRequest -> Unit
                     is ServerEvent.TrustedAutoAccepted ->
                         _messages.trySend("Kiriman dari ${event.request.deviceName} diterima otomatis (perangkat tepercaya)")
+                    is ServerEvent.BrowserOfferResult -> _messages.trySend(
+                        if (event.accepted) "${event.browserName} mulai mengunduh" else "${event.browserName} menolak kiriman"
+                    )
                     is ServerEvent.AddressChanged ->
                         _messages.trySend("Alamat berubah ke ${event.ip} — pindai ulang QR di perangkat lain")
                 }
@@ -219,6 +233,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setAutoStartServer(enabled: Boolean) {
         viewModelScope.launch { container.preferences.setAutoStartServer(enabled) }
+    }
+
+    fun setIdleStopMinutes(minutes: Int) {
+        viewModelScope.launch { container.preferences.setIdleStopMinutes(minutes) }
+    }
+
+    fun offerToBrowser(browser: ConnectedBrowser) {
+        if (sharedItems.value.isEmpty()) {
+            _messages.trySend("Antrean kosong. Tambahkan file atau teks dulu.")
+            return
+        }
+        if (serverManager.offerToBrowser(browser.id)) {
+            _messages.trySend("Tawaran dikirim ke ${browser.name}. Ketuk Unduh di layarnya.")
+        } else {
+            _messages.trySend("${browser.name} sudah tidak terhubung")
+        }
+    }
+
+    fun refreshCrashLogs() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _crashLogCount.value = CrashLogger.logs(getApplication()).count { it.name.startsWith("crash-") }
+        }
+    }
+
+    /** Returns a shareable content Uri bundling all crash logs, or null when there are none. */
+    suspend fun crashReportUri(): Uri? = withContext(Dispatchers.IO) {
+        val app = getApplication<Application>()
+        CrashLogger.bundle(app)?.let { FileProvider.getUriForFile(app, app.packageName + ".fileprovider", it) }
+    }
+
+    fun clearCrashLogs() {
+        viewModelScope.launch(Dispatchers.IO) {
+            CrashLogger.clear(getApplication())
+            _crashLogCount.value = 0
+        }
     }
 
     fun setPinInQr(enabled: Boolean) {
@@ -387,7 +436,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _sendingPeerId.value = peer.id
         _messages.trySend("Menunggu persetujuan dari ${peer.name}…")
         viewModelScope.launch {
-            val result = container.peerClient.sendItems(peer, pin, items, preferences.value.deviceNickname)
+            val result = container.peerClient.sendItems(peer, pin, items, preferences.value.deviceNickname) { code ->
+                _verificationCode.value = code
+            }
+            _verificationCode.value = null
             _sendingPeerId.value = null
             val message = when (result) {
                 is PeerSendResult.Success -> {

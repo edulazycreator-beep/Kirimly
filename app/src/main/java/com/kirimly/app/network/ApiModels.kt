@@ -13,7 +13,9 @@ data class ServerInfoResponse(
     val pinRequired: Boolean,
     val sharedCount: Int = 0,
     val features: List<String> = emptyList(),
-    val trusted: Boolean = false
+    val trusted: Boolean = false,
+    val publicKey: String? = null,
+    val deviceId: String? = null
 )
 
 @Serializable
@@ -27,6 +29,7 @@ data class FileMetaDto(
 data class UploadRequestBody(
     val deviceName: String = "",
     val deviceId: String? = null,
+    val publicKey: String? = null,
     val files: List<FileMetaDto> = emptyList()
 )
 
@@ -79,7 +82,18 @@ data class WsMessage(
     val type: String,
     val message: String? = null,
     val fileName: String? = null,
-    val progress: Float? = null
+    val progress: Float? = null,
+    val items: List<SharedItemDto>? = null
+)
+
+/** Persisted form of an approved request (see ApprovedTokenEntity). */
+@Serializable
+data class ApprovedTokenDto(
+    val requestId: String,
+    val deviceId: String? = null,
+    val deviceName: String,
+    val clientPublicKey: String? = null,
+    val files: List<FileMetaDto>
 )
 
 @Serializable

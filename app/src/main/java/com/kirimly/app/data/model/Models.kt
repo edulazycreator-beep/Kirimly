@@ -117,7 +117,11 @@ data class PendingTransferRequest(
     val remoteAddress: String,
     val files: List<IncomingFileMeta>,
     val createdAt: Long,
-    val expiresAt: Long
+    val expiresAt: Long,
+    /** Short code both screens show for end-to-end transfers; matching codes rule out a man in the middle. */
+    val verificationCode: String? = null,
+    /** "lan" for the HTTP server, "nearby" for Nearby Connections. */
+    val channel: String = "lan"
 ) {
     val totalSize: Long get() = files.sumOf { it.sizeBytes.coerceAtLeast(0L) }
 }
@@ -186,7 +190,17 @@ data class UserPreferences(
     val pinInQr: Boolean,
     val convertHeic: Boolean,
     val deviceId: String,
-    val trustedDevices: List<TrustedDevice>
+    val trustedDevices: List<TrustedDevice>,
+    /** Stop the server after this many idle minutes while the app is in the background; 0 = never. */
+    val idleStopMinutes: Int
+)
+
+/** A Safari / browser tab currently connected to the portal over WebSocket. */
+data class ConnectedBrowser(
+    val id: String,
+    val name: String,
+    val address: String,
+    val connectedAt: Long
 )
 
 /** A remote device the user chose to trust: it skips the PIN and is accepted automatically. */
