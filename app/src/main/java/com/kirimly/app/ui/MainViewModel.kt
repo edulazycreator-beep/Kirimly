@@ -69,6 +69,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val sharedItems: StateFlow<List<SharedItem>> = serverManager.sharedItems
     val pendingRequests: StateFlow<List<PendingTransferRequest>> = serverManager.pendingRequests
     val activeTransfers: StateFlow<List<TransferProgress>> = container.transferTracker.active
+
+    /** Outgoing transfers (to Android or downloads by Safari) belong on the Send tab. */
+    val sendingTransfers: StateFlow<List<TransferProgress>> = activeTransfers
+        .map { list -> list.filter { it.direction == TransferDirection.SENT } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Incoming transfers belong on the Receive tab. */
+    val receivingTransfers: StateFlow<List<TransferProgress>> = activeTransfers
+        .map { list -> list.filter { it.direction == TransferDirection.RECEIVED } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val peers: StateFlow<List<PeerDevice>> = container.nsdManager.peers
     val isDiscovering: StateFlow<Boolean> = container.nsdManager.isDiscovering
     val unreachablePeers: StateFlow<List<String>> = container.nsdManager.unreachablePeers

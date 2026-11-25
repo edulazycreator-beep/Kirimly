@@ -382,4 +382,8 @@
     <string name="u_lang_code" translatable="false">id</string>
     <string name="u_type_in_safari">Tidak bisa memindai? Ketik di Safari:</string>
     <string name="u_then_enter_code">lalu masukkan kode ini</string>
+    <string name="u_sending_now">Sedang dikirim</string>
+    <string name="u_receiving_now">Sedang diterima</string>
+    <string name="u_from_peer">Dari %1$s</string>
+    <string name="u_to_peer">Ke %1$s</string>
 </resources>

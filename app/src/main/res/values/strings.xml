@@ -382,4 +382,8 @@
     <string name="u_lang_code" translatable="false">en</string>
     <string name="u_type_in_safari">Can\'t scan? Type in Safari:</string>
     <string name="u_then_enter_code">then enter this code</string>
+    <string name="u_sending_now">Sending</string>
+    <string name="u_receiving_now">Receiving</string>
+    <string name="u_from_peer">From %1$s</string>
+    <string name="u_to_peer">To %1$s</string>
 </resources>

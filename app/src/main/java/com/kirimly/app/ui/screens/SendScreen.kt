@@ -2,6 +2,7 @@
 
 package com.kirimly.app.ui.screens
 
+import com.kirimly.app.ui.components.TransferSection
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -86,6 +87,7 @@ fun SendScreen(
     val totalBytes by viewModel.queueTotalBytes.collectAsStateWithLifecycle()
     val sendingPeerId by viewModel.sendingPeerId.collectAsStateWithLifecycle()
     val unreachable by viewModel.unreachablePeers.collectAsStateWithLifecycle()
+    val sending by viewModel.sendingTransfers.collectAsStateWithLifecycle()
 
     var pinTarget by remember { mutableStateOf<PeerDevice?>(null) }
     var showTextDialog by remember { mutableStateOf(false) }
@@ -122,6 +124,17 @@ fun SendScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (sending.isNotEmpty()) {
+                item(key = "sending") {
+                    TransferSection(
+                        title = tr(R.string.u_sending_now),
+                        transfers = sending,
+                        onDismiss = viewModel::dismissTransfer,
+                        onClearFinished = viewModel::clearFinishedTransfers
+                    )
+                }
+            }
+
             // ---------------- Step 1: what
             item(key = "step1") {
                 StepCard(number = 1, title = tr(R.string.u_step_what)) {

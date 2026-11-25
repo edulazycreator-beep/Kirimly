@@ -1,5 +1,6 @@
 package com.kirimly.app.ui.screens
 
+import com.kirimly.app.ui.components.TransferSection
 import com.kirimly.app.ui.theme.MonoDigits
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.RectangleShape
@@ -71,7 +72,7 @@ fun ReceiveScreen(
     val qrUrl by viewModel.qrUrl.collectAsStateWithLifecycle()
     val pin by viewModel.pin.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
-    val transfers by viewModel.activeTransfers.collectAsStateWithLifecycle()
+    val transfers by viewModel.receivingTransfers.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.ensureServerRunning()
@@ -105,6 +106,17 @@ fun ReceiveScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item(key = "status") { StatusLine(serverState = serverState, deviceName = preferences.deviceNickname) }
+
+            if (transfers.isNotEmpty()) {
+                item(key = "receiving") {
+                    TransferSection(
+                        title = tr(R.string.u_receiving_now),
+                        transfers = transfers,
+                        onDismiss = viewModel::dismissTransfer,
+                        onClearFinished = viewModel::clearFinishedTransfers
+                    )
+                }
+            }
 
             if (!online) {
                 item(key = "offline") {
@@ -155,20 +167,6 @@ fun ReceiveScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
-                }
-            }
-
-            if (transfers.isNotEmpty()) {
-                item(key = "transfersHeader") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(tr(R.string.u_transfers), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        if (transfers.any { it.isFinished }) {
-                            TextButton(onClick = viewModel::clearFinishedTransfers) { Text(tr(R.string.u_clear)) }
-                        }
-                    }
-                }
-                items(transfers, key = { it.id }) { progress: TransferProgress ->
-                    TransferProgressCard(progress = progress, onDismiss = { viewModel.dismissTransfer(progress.id) })
                 }
             }
 

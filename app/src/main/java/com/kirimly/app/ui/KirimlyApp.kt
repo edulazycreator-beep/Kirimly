@@ -1,5 +1,6 @@
 package com.kirimly.app.ui
 
+import com.kirimly.app.data.model.TransferDirection
 import com.kirimly.app.util.tr
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -152,6 +153,8 @@ fun KirimlyApp(viewModel: MainViewModel) {
     }
 
     val runningTransfers = activeTransfers.count { !it.isFinished }
+    val runningSent = activeTransfers.count { !it.isFinished && it.direction == TransferDirection.SENT }
+    val runningReceived = activeTransfers.count { !it.isFinished && it.direction == TransferDirection.RECEIVED }
     val serverState by viewModel.serverState.collectAsStateWithLifecycle()
     var showExitDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -180,11 +183,15 @@ fun KirimlyApp(viewModel: MainViewModel) {
                             }
                         },
                         icon = {
-                            val showBadge = destination.route == MainViewModel.ROUTE_RECEIVE &&
-                                (runningTransfers > 0 || pendingRequests.isNotEmpty())
+                            val badgeCount = when (destination.route) {
+                                MainViewModel.ROUTE_SEND -> runningSent
+                                MainViewModel.ROUTE_RECEIVE -> runningReceived + pendingRequests.size
+                                else -> 0
+                            }
+                            val showBadge = badgeCount > 0
                             BadgedBox(badge = {
                                 if (showBadge) {
-                                    Badge { Text("${runningTransfers + pendingRequests.size}") }
+                                    Badge { Text("$badgeCount") }
                                 }
                             }) {
                                 AnimatedNavIcon(
@@ -239,7 +246,17 @@ fun KirimlyApp(viewModel: MainViewModel) {
     pendingRequests.firstOrNull()?.let { request ->
         ApprovalBottomSheet(
             request = request,
-            onAccept = { trust -> viewModel.respondToRequest(request.id, true, trust) },
+            onAccept = { trust ->
+                viewModel.respondToRequest(request.id, true, trust)
+                // Show where the incoming progress appears.
+                if (currentRoute != MainViewModel.ROUTE_RECEIVE) {
+                    navController.navigate(MainViewModel.ROUTE_RECEIVE) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            },
             onDecline = { viewModel.respondToRequest(request.id, false) }
         )
     }
