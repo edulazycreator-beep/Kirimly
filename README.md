@@ -42,6 +42,6 @@ ui/        Theme (5 palet × terang/gelap), komponen, MainViewModel, layar Kirim
 
 ## Catatan
 
-- Belum pernah dikompilasi di lingkungan pembuatnya (tanpa Android SDK); build pertama CI adalah verifikasinya.
+- CI GitHub Actions lulus (`assembleDebug`); APK debug tersedia sebagai artefak `kirimly-debug-apk`.
 - Release build memakai R8 tetapi belum dikonfigurasi signing — tambahkan `signingConfigs` sendiri.
 - Portal web memakai HTTP biasa di jaringan lokal; `navigator.clipboard` di Safari memakai fallback `execCommand`.
