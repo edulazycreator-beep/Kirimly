@@ -24,11 +24,18 @@ Stack: AGP 8.7.3 · Gradle 8.11.1 · Kotlin 2.0.21 · Compose BOM 2024.12.01 · 
 | GET | `/api/info` | Nama perangkat, status PIN |
 | POST | `/api/verify-pin` | Cek PIN (`X-Kirimly-Pin`) |
 | POST | `/api/request-upload` | Minta izin kirim; ditahan hingga Terima/Tolak (maks 55 dtk) → token |
-| POST | `/api/upload?token&index&name` | Multipart streaming, buffer 8 KB ke MediaStore |
+| POST | `/api/upload/init` | Mulai upload resumable (token, index, ukuran, folder relatif, kunci ECDH opsional) |
+| POST | `/api/upload/chunk?id&offset` | Chunk 4 MB + header `X-Chunk-Sha256`; 409 mengembalikan offset server |
+| GET | `/api/upload/status?id` | Offset terakhir untuk melanjutkan |
+| POST | `/api/upload/complete?id` | Verifikasi SHA-256 penuh, publikasikan ke Downloads/Kirimly |
+| POST | `/api/upload?token&index&name` | Upload multipart lama (kompatibilitas) |
+| GET | `/api/download-all` | Semua antrean sebagai ZIP streaming |
 | POST | `/api/text` | Teks → clipboard + riwayat |
 | GET | `/api/shared-files` | Antrean yang dibagikan Android |
 | GET | `/api/download/{id}` | Unduh item antrean |
-| WS | `/ws` | Pembaruan langsung (antrean, PIN berubah) |
+| WS | `/ws` | Pembaruan langsung (antrean, PIN berubah, alamat berubah) |
+
+Android ↔ Android: chunk terenkripsi ECDH P-256 + AES-256-GCM, 3 file paralel. Perangkat tepercaya (`X-Kirimly-Device`) melewati PIN dan persetujuan. Apple membuka `http://kirimly.local:PORT` lewat responder mDNS bawaan.
 
 ## Struktur
 
