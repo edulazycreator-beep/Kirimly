@@ -1,5 +1,7 @@
 package com.kirimly.app.network
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -174,11 +176,11 @@ class NearbyTransferManager(
         val text = error.message.orEmpty()
         return when {
             text.contains("MISSING_PERMISSION", true) || text.contains("8034") || text.contains("8032") ->
-                "Izin Bluetooth / Perangkat Terdekat diperlukan untuk Nearby"
+                tr(R.string.s_izin_bluetooth_perangkat_terdekat_diperlukan)
             text.contains("API_UNAVAILABLE", true) || text.contains("SERVICE_MISSING", true) ->
-                "Nearby butuh Google Play Services"
-            text.contains("BLUETOOTH", true) -> "Nyalakan Bluetooth untuk menemukan perangkat tanpa Wi-Fi"
-            else -> "Nearby tidak tersedia: ${text.take(80)}"
+                tr(R.string.s_nearby_butuh_google_play_services)
+            text.contains("BLUETOOTH", true) -> tr(R.string.s_nyalakan_bluetooth_untuk_menemukan_perangkat)
+            else -> tr(R.string.s_nearby_tidak_tersedia, text.take(80))
         }
     }
 
@@ -236,7 +238,7 @@ class NearbyTransferManager(
             link.connected.complete(false)
             link.decision.complete(false)
             link.outgoing.values.forEach { it.complete(false) }
-            link.trackIds.values.forEach { tracker.finish(it, TransferStatus.FAILED, errorMessage = "Koneksi Nearby terputus") }
+            link.trackIds.values.forEach { tracker.finish(it, TransferStatus.FAILED, errorMessage = tr(R.string.s_koneksi_nearby_terputus)) }
         }
     }
 
@@ -281,10 +283,10 @@ class NearbyTransferManager(
                 }
                 PayloadTransferUpdate.Status.FAILURE, PayloadTransferUpdate.Status.CANCELED -> {
                     link.outgoing[id]?.let { done ->
-                        link.outgoingTrack[id]?.let { tracker.finish(it, TransferStatus.FAILED, update.bytesTransferred, "Nearby gagal") }
+                        link.outgoingTrack[id]?.let { tracker.finish(it, TransferStatus.FAILED, update.bytesTransferred, tr(R.string.s_nearby_gagal)) }
                         done.complete(false)
                     }
-                    link.trackIds[id]?.let { tracker.finish(it, TransferStatus.FAILED, update.bytesTransferred, "Nearby gagal") }
+                    link.trackIds[id]?.let { tracker.finish(it, TransferStatus.FAILED, update.bytesTransferred, tr(R.string.s_nearby_gagal)) }
                 }
                 else -> Unit
             }
@@ -362,10 +364,10 @@ class NearbyTransferManager(
         val file = payload.asFile()
         try {
             val saved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val uri = file?.asUri() ?: throw IllegalStateException("File Nearby tidak ditemukan")
+                val uri = file?.asUri() ?: throw IllegalStateException(tr(R.string.s_file_nearby_tidak_ditemukan))
                 val result = appContext.contentResolver.openInputStream(uri)?.use { input ->
                     MediaStoreWriter.saveToDownloads(appContext, meta.name, meta.mimeType, input) {}
-                } ?: throw IllegalStateException("File Nearby tidak bisa dibaca")
+                } ?: throw IllegalStateException(tr(R.string.s_file_nearby_tidak_bisa_dibaca))
                 try {
                     appContext.contentResolver.delete(uri, null, null)
                 } catch (_: Exception) {
@@ -373,7 +375,7 @@ class NearbyTransferManager(
                 result
             } else {
                 @Suppress("DEPRECATION")
-                val javaFile = file?.asJavaFile() ?: throw IllegalStateException("File Nearby tidak ditemukan")
+                val javaFile = file?.asJavaFile() ?: throw IllegalStateException(tr(R.string.s_file_nearby_tidak_ditemukan))
                 val result = FileInputStream(javaFile).use { input ->
                     MediaStoreWriter.saveToDownloads(appContext, meta.name, meta.mimeType, input) {}
                 }
@@ -393,8 +395,8 @@ class NearbyTransferManager(
             tracker.finish(trackId, TransferStatus.COMPLETED, saved.bytesWritten)
             server.emitEvent(ServerEvent.FileReceived(saved.displayName, link.remoteName))
         } catch (e: Exception) {
-            tracker.finish(trackId, TransferStatus.FAILED, errorMessage = e.message ?: "Gagal menyimpan")
-            server.emitEvent(ServerEvent.FileFailed(meta.name, e.message ?: "Gagal menyimpan"))
+            tracker.finish(trackId, TransferStatus.FAILED, errorMessage = e.message ?: tr(R.string.s_gagal_menyimpan))
+            server.emitEvent(ServerEvent.FileFailed(meta.name, e.message ?: tr(R.string.s_gagal_menyimpan)))
         } finally {
             try {
                 file?.asParcelFileDescriptor()?.close()
@@ -430,9 +432,9 @@ class NearbyTransferManager(
                     _lastError.value = describe(error)
                     requested.complete(false)
                 }
-            if (!requested.await()) return PeerSendResult.Failed(_lastError.value ?: "Tidak dapat terhubung lewat Nearby")
+            if (!requested.await()) return PeerSendResult.Failed(_lastError.value ?: tr(R.string.s_tidak_dapat_terhubung_lewat_nearby))
             val connected = withTimeoutOrNull(CONNECT_TIMEOUT_MS) { link.connected.await() } == true
-            if (!connected) return PeerSendResult.Failed("${peer.name} tidak merespons lewat Nearby")
+            if (!connected) return PeerSendResult.Failed(tr(R.string.s_tidak_merespons_lewat_nearby, peer.name))
             onVerificationCode(link.authDigits.ifBlank { null })
 
             // Build file payloads first so their ids can be listed in the manifest.
@@ -484,9 +486,9 @@ class NearbyTransferManager(
                 }
             }
             return if (sent == files.size) PeerSendResult.Success(sent, texts.size, encrypted = true)
-            else PeerSendResult.Failed("$sent dari ${files.size} file terkirim lewat Nearby")
+            else PeerSendResult.Failed(tr(R.string.s_dari_file_terkirim_lewat_nearby, sent, files.size))
         } catch (e: Exception) {
-            return PeerSendResult.Failed(e.message ?: "Nearby gagal")
+            return PeerSendResult.Failed(e.message ?: tr(R.string.s_nearby_gagal))
         } finally {
             onVerificationCode(null)
             delay(800)

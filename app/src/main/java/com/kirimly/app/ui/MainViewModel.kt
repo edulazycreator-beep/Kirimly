@@ -1,5 +1,7 @@
 package com.kirimly.app.ui
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
@@ -172,17 +174,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             serverManager.events.collect { event ->
                 when (event) {
                     is ServerEvent.FileReceived -> _messages.trySend("Diterima: ${event.fileName}")
-                    is ServerEvent.FileFailed -> _messages.trySend("Gagal menerima ${event.fileName}: ${event.reason}")
-                    is ServerEvent.TextReceived -> _messages.trySend("Teks dari ${event.from} disalin ke clipboard")
+                    is ServerEvent.FileFailed -> _messages.trySend(tr(R.string.s_gagal_menerima, event.fileName, event.reason))
+                    is ServerEvent.TextReceived -> _messages.trySend(tr(R.string.s_teks_dari_disalin_ke_clipboard, event.from))
                     is ServerEvent.FileDownloaded -> _messages.trySend("${event.by} mengunduh ${event.fileName}")
                     is ServerEvent.IncomingRequest -> Unit
                     is ServerEvent.TrustedAutoAccepted ->
-                        _messages.trySend("Kiriman dari ${event.request.deviceName} diterima otomatis (perangkat tepercaya)")
+                        _messages.trySend(tr(R.string.s_kiriman_dari_diterima_otomatis_perangkat, event.request.deviceName))
                     is ServerEvent.BrowserOfferResult -> _messages.trySend(
-                        if (event.accepted) "${event.browserName} mulai mengunduh" else "${event.browserName} menolak kiriman"
+                        if (event.accepted) tr(R.string.s_mulai_mengunduh, event.browserName) else tr(R.string.s_menolak_kiriman, event.browserName)
                     )
                     is ServerEvent.AddressChanged ->
-                        _messages.trySend("Alamat berubah ke ${event.ip} — pindai ulang QR di perangkat lain")
+                        _messages.trySend(tr(R.string.s_alamat_berubah_ke_pindai_ulang, event.ip))
                 }
             }
         }
@@ -221,7 +223,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshPin() {
         serverManager.refreshPin()
-        _messages.trySend("PIN baru dibuat")
+        _messages.trySend(tr(R.string.s_pin_baru_dibuat))
     }
 
     fun setPinRequired(required: Boolean) {
@@ -252,13 +254,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun offerToBrowser(browser: ConnectedBrowser) {
         if (sharedItems.value.isEmpty()) {
-            _messages.trySend("Antrean kosong. Tambahkan file atau teks dulu.")
+            _messages.trySend(tr(R.string.s_antrean_kosong_tambahkan_file_atau))
             return
         }
         if (serverManager.offerToBrowser(browser.id)) {
-            _messages.trySend("Tawaran dikirim ke ${browser.name}. Ketuk Unduh di layarnya.")
+            _messages.trySend(tr(R.string.s_tawaran_dikirim_ke_ketuk_unduh, browser.name))
         } else {
-            _messages.trySend("${browser.name} sudah tidak terhubung")
+            _messages.trySend(tr(R.string.s_sudah_tidak_terhubung, browser.name))
         }
     }
 
@@ -291,7 +293,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeTrustedDevice(id: String) {
         viewModelScope.launch { container.preferences.removeTrustedDevice(id) }
-        _messages.trySend("Perangkat dihapus dari daftar tepercaya")
+        _messages.trySend(tr(R.string.s_perangkat_dihapus_dari_daftar_tepercaya))
     }
 
     fun setQrMode(mode: QrMode) {
@@ -313,11 +315,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setManualHotspot(ssid: String, password: String) {
         if (ssid.isBlank()) {
-            _messages.trySend("SSID tidak boleh kosong")
+            _messages.trySend(tr(R.string.s_ssid_tidak_boleh_kosong))
             return
         }
         if (password.isNotEmpty() && password.length < 8) {
-            _messages.trySend("Kata sandi WPA minimal 8 karakter")
+            _messages.trySend(tr(R.string.s_kata_sandi_wpa_minimal_8))
             return
         }
         container.hotspotManager.setManualCredentials(ssid, password)
@@ -353,7 +355,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun joinIphoneHotspot(ssid: String, password: String) {
         if (ssid.isBlank()) {
-            _messages.trySend("Isi nama hotspot iPhone")
+            _messages.trySend(tr(R.string.s_isi_nama_hotspot_iphone))
             return
         }
         container.wifiJoiner.join(ssid, password) {
@@ -423,11 +425,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             if (items.isEmpty()) {
-                _messages.trySend("File tidak dapat dibaca")
+                _messages.trySend(tr(R.string.s_file_tidak_dapat_dibaca))
             } else {
                 serverManager.addSharedItems(items)
-                val note = if (copied > 0) " ($copied disalin agar tetap bisa diakses)" else ""
-                _messages.trySend("${items.size} file ditambahkan ke antrean$note")
+                val note = if (copied > 0) tr(R.string.s_disalin_agar_tetap_bisa_diakses, copied) else ""
+                _messages.trySend(tr(R.string.s_file_ditambahkan_ke_antrean, items.size, note))
             }
         }
     }
@@ -435,11 +437,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addText(text: String): Boolean {
         val clean = text.trim()
         if (clean.isEmpty()) {
-            _messages.trySend("Teks masih kosong")
+            _messages.trySend(tr(R.string.s_teks_masih_kosong))
             return false
         }
         serverManager.addSharedItems(listOf(SharedText(UUID.randomUUID().toString(), clean)))
-        _messages.trySend("Teks ditambahkan ke antrean")
+        _messages.trySend(tr(R.string.s_teks_ditambahkan_ke_antrean))
         return true
     }
 
@@ -490,15 +492,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun sendToPeer(peer: PeerDevice, pin: String?) {
         val items = sharedItems.value
         if (items.isEmpty()) {
-            _messages.trySend("Antrean kosong. Tambahkan file atau teks dulu.")
+            _messages.trySend(tr(R.string.s_antrean_kosong_tambahkan_file_atau))
             return
         }
         if (_sendingPeerId.value != null) {
-            _messages.trySend("Masih mengirim ke perangkat lain…")
+            _messages.trySend(tr(R.string.s_masih_mengirim_ke_perangkat_lain))
             return
         }
         _sendingPeerId.value = peer.id
-        _messages.trySend("Menunggu persetujuan dari ${peer.name}…")
+        _messages.trySend(tr(R.string.s_menunggu_persetujuan_dari, peer.name))
         viewModelScope.launch {
             val result = if (peer.channel == PeerDevice.CHANNEL_NEARBY) {
                 container.nearbyManager.send(peer, items, preferences.value.deviceNickname) { code ->
@@ -517,11 +519,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         if (result.fileCount > 0) add("${result.fileCount} file")
                         if (result.textCount > 0) add("${result.textCount} teks")
                     }.joinToString(" & ")
-                    "Terkirim ke ${peer.name}: $parts" + if (result.encrypted) " • terenkripsi" else ""
+                    tr(R.string.s_terkirim_ke, peer.name, parts) + if (result.encrypted) tr(R.string.s_terenkripsi) else ""
                 }
-                PeerSendResult.PinRejected -> "PIN salah untuk ${peer.name}"
-                PeerSendResult.Declined -> "${peer.name} menolak kiriman"
-                PeerSendResult.Timeout -> "${peer.name} tidak merespons"
+                PeerSendResult.PinRejected -> tr(R.string.s_pin_salah_untuk, peer.name)
+                PeerSendResult.Declined -> tr(R.string.s_menolak_kiriman_2, peer.name)
+                PeerSendResult.Timeout -> tr(R.string.s_tidak_merespons, peer.name)
                 is PeerSendResult.Failed -> "Gagal: ${result.message}"
             }
             _messages.trySend(message)
@@ -544,14 +546,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearHistory() {
         viewModelScope.launch(Dispatchers.IO) { dao.clearAll() }
-        _messages.trySend("Riwayat dihapus")
+        _messages.trySend(tr(R.string.s_riwayat_dihapus))
     }
 
     fun copyToClipboard(text: String) {
         val clipboard = getApplication<Application>().getSystemService(ClipboardManager::class.java) ?: return
         clipboard.setPrimaryClip(ClipData.newPlainText("Kirimly", text))
         // Android 13+ shows its own clipboard confirmation.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) _messages.trySend("Disalin ke clipboard")
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) _messages.trySend(tr(R.string.s_disalin_ke_clipboard))
     }
 
     fun showMessage(message: String) {
@@ -570,7 +572,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setNickname(nickname: String) {
         viewModelScope.launch { container.preferences.setDeviceNickname(nickname) }
-        _messages.trySend("Nama perangkat disimpan")
+        _messages.trySend(tr(R.string.s_nama_perangkat_disimpan))
     }
 
     fun completeOnboarding() {

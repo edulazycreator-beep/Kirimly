@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.components
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -59,7 +61,7 @@ fun AnimatedKirimlyMark(
         label = "dash"
     )
 
-    Canvas(modifier = modifier.semantics { contentDescription = "Logo Kirimly" }) {
+    Canvas(modifier = modifier.semantics { contentDescription = tr(R.string.s_logo_kirimly) }) {
         val unit = size.minDimension / GRID
         val originX = (size.width - GRID * unit) / 2f
         val originY = (size.height - GRID * unit) / 2f

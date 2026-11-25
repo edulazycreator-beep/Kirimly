@@ -2,6 +2,8 @@
 
 package com.kirimly.app.ui.screens
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.compose.material.icons.rounded.Language
 import com.kirimly.app.data.model.ConnectedBrowser
 import androidx.compose.ui.unit.sp
@@ -131,9 +133,9 @@ fun SendScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Kirim", style = MaterialTheme.typography.headlineSmall)
+                        Text(tr(R.string.s_kirim), style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            "Bagikan ke perangkat terdekat",
+                            tr(R.string.s_bagikan_ke_perangkat_terdekat),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -141,7 +143,7 @@ fun SendScreen(
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Palette, contentDescription = "Tema & pengaturan")
+                        Icon(Icons.Rounded.Palette, contentDescription = tr(R.string.s_tema_pengaturan))
                     }
                 },
                 scrollBehavior = scrollBehavior
@@ -163,7 +165,7 @@ fun SendScreen(
                     sendingPeerId = sendingPeerId,
                     onPeerClick = { peer ->
                         if (queue.isEmpty()) {
-                            viewModel.showMessage("Antrean kosong. Tambahkan file atau teks dulu.")
+                            viewModel.showMessage(tr(R.string.s_antrean_kosong_tambahkan_file_atau))
                         } else if (peer.pinRequired && peer.channel != PeerDevice.CHANNEL_NEARBY) {
                             pinTarget = peer
                         } else {
@@ -190,7 +192,7 @@ fun SendScreen(
             if (nearbyError != null && peers.isEmpty()) {
                 item(key = "nearbyError") {
                     Text(
-                        text = nearbyError.orEmpty() + ". Perangkat di Wi-Fi yang sama tetap bisa ditemukan.",
+                        text = nearbyError.orEmpty() + tr(R.string.s_perangkat_di_wi_fi_yang),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -207,12 +209,12 @@ fun SendScreen(
                     ) {
                         Icon(Icons.Rounded.AttachFile, contentDescription = null)
                         Spacer(Modifier.size(8.dp))
-                        Text("Pilih File")
+                        Text(tr(R.string.s_pilih_file))
                     }
                     FilledTonalButton(
                         onClick = {
                             val clip = viewModel.readClipboardText()
-                            if (clip == null) viewModel.showMessage("Clipboard kosong") else viewModel.addText(clip)
+                            if (clip == null) viewModel.showMessage(tr(R.string.s_clipboard_kosong)) else viewModel.addText(clip)
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -231,7 +233,7 @@ fun SendScreen(
                     onTextChange = { textDraft = it },
                     onPaste = {
                         val clip = viewModel.readClipboardText()
-                        if (clip == null) viewModel.showMessage("Clipboard kosong") else textDraft = clip
+                        if (clip == null) viewModel.showMessage(tr(R.string.s_clipboard_kosong)) else textDraft = clip
                     },
                     onAdd = { if (viewModel.addText(textDraft)) textDraft = "" }
                 )
@@ -244,7 +246,7 @@ fun SendScreen(
                         .fillMaxWidth()
                         .padding(top = 8.dp)
                 ) {
-                    Text("Antrean", style = MaterialTheme.typography.titleMedium)
+                    Text(tr(R.string.s_antrean), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.size(8.dp))
                     if (queue.isNotEmpty()) {
                         Surface(
@@ -252,7 +254,7 @@ fun SendScreen(
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
-                                text = "${queue.size} item • ${NetworkUtils.formatFileSize(totalBytes)}",
+                                text = tr(R.string.s_item, queue.size, NetworkUtils.formatFileSize(totalBytes)),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -264,7 +266,7 @@ fun SendScreen(
                         TextButton(onClick = viewModel::clearQueue) {
                             Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.size(6.dp))
-                            Text("Kosongkan")
+                            Text(tr(R.string.s_kosongkan))
                         }
                     }
                 }
@@ -283,12 +285,12 @@ fun SendScreen(
     verificationCode?.let { code ->
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Cocokkan kode ini") },
+            title = { Text(tr(R.string.s_cocokkan_kode_ini)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(code, style = MonoDigits.copy(fontSize = 32.sp))
                     Text(
-                        "Kode yang sama harus tampil di layar penerima. Jika berbeda, minta penerima menolak: ada perangkat lain di tengah koneksi.",
+                        tr(R.string.s_kode_yang_sama_harus_tampil),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -311,15 +313,15 @@ fun SendScreen(
     confirmTarget?.let { peer ->
         AlertDialog(
             onDismissRequest = { confirmTarget = null },
-            title = { Text("Kirim ke ${peer.name}?") },
-            text = { Text("${queue.size} item (${NetworkUtils.formatFileSize(totalBytes)}) akan dikirim. Penerima perlu menyetujui di perangkatnya.") },
+            title = { Text(tr(R.string.s_kirim_ke, peer.name)) },
+            text = { Text(tr(R.string.s_item_akan_dikirim_penerima_perlu, queue.size, NetworkUtils.formatFileSize(totalBytes))) },
             confirmButton = {
                 Button(onClick = {
                     confirmTarget = null
                     viewModel.sendToPeer(peer, null)
-                }) { Text("Kirim") }
+                }) { Text(tr(R.string.s_kirim)) }
             },
-            dismissButton = { TextButton(onClick = { confirmTarget = null }) { Text("Batal") } }
+            dismissButton = { TextButton(onClick = { confirmTarget = null }) { Text(tr(R.string.s_batal)) } }
         )
     }
 }
@@ -343,13 +345,13 @@ private fun RadarCard(
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Radar perangkat", style = MaterialTheme.typography.titleMedium)
+                    Text(tr(R.string.s_radar_perangkat), style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = when {
-                            sendingPeerId != null -> "Mengirim… tunggu persetujuan penerima"
-                            peers.isNotEmpty() -> "${peers.size} perangkat Kirimly ditemukan — ketuk untuk mengirim"
-                            isDiscovering -> "Mencari perangkat Kirimly di jaringan ini…"
-                            else -> "Pemindaian berhenti"
+                            sendingPeerId != null -> tr(R.string.s_mengirim_tunggu_persetujuan_penerima)
+                            peers.isNotEmpty() -> tr(R.string.s_perangkat_kirimly_ditemukan_ketuk_untuk, peers.size)
+                            isDiscovering -> tr(R.string.s_mencari_perangkat_kirimly_di_jaringan)
+                            else -> tr(R.string.s_pemindaian_berhenti)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -358,7 +360,7 @@ private fun RadarCard(
                 if (sendingPeerId != null) {
                     CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
                 } else {
-                    IconButton(onClick = onRescan) { Icon(Icons.Rounded.Refresh, contentDescription = "Pindai ulang") }
+                    IconButton(onClick = onRescan) { Icon(Icons.Rounded.Refresh, contentDescription = tr(R.string.s_pindai_ulang)) }
                 }
             }
 
@@ -372,13 +374,13 @@ private fun RadarCard(
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Berbagi cepat ke Safari", style = MaterialTheme.typography.titleSmall)
+                            Text(tr(R.string.s_berbagi_cepat_ke_safari), style = MaterialTheme.typography.titleSmall)
                             Text(
                                 text = when (serverState) {
-                                    is ServerState.Running -> "iPhone bisa mengunduh antrean di ${serverState.url}"
-                                    ServerState.Starting -> "Menyalakan server…"
+                                    is ServerState.Running -> tr(R.string.s_iphone_bisa_mengunduh_antrean_di, serverState.url)
+                                    ServerState.Starting -> tr(R.string.s_menyalakan_server)
                                     is ServerState.Error -> serverState.message
-                                    ServerState.Stopped -> "Nyalakan agar iOS dapat mengambil file lewat browser"
+                                    ServerState.Stopped -> tr(R.string.s_nyalakan_agar_ios_dapat_mengambil)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -417,17 +419,17 @@ private fun TextComposerCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.size(10.dp))
-                Text("Kirim teks / tautan", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(tr(R.string.s_kirim_teks_tautan), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 AssistChip(
                     onClick = onPaste,
-                    label = { Text("Tempel") },
+                    label = { Text(tr(R.string.s_tempel)) },
                     leadingIcon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp)) }
                 )
             }
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
-                placeholder = { Text("Ketik pesan, catatan, atau URL…") },
+                placeholder = { Text(tr(R.string.s_ketik_pesan_catatan_atau_url)) },
                 minLines = 2,
                 maxLines = 6,
                 shape = RectangleShape,
@@ -441,7 +443,7 @@ private fun TextComposerCard(
                 ) {
                     Icon(Icons.Rounded.PlaylistAdd, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text("Tambah ke antrean")
+                    Text(tr(R.string.s_tambah_ke_antrean))
                 }
             }
         }
@@ -480,7 +482,7 @@ private fun QueueItemRow(item: SharedItem, onRemove: () -> Unit) {
                 Text(
                     text = when (item) {
                         is SharedFile -> NetworkUtils.formatFileSize(item.sizeBytes) + " • " + item.mimeType
-                        is SharedText -> "Teks • ${item.text.length} karakter"
+                        is SharedText -> tr(R.string.s_teks_karakter, item.text.length)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -489,7 +491,7 @@ private fun QueueItemRow(item: SharedItem, onRemove: () -> Unit) {
                 )
             }
             IconButton(onClick = onRemove) {
-                Icon(Icons.Rounded.Close, contentDescription = "Hapus dari antrean")
+                Icon(Icons.Rounded.Close, contentDescription = tr(R.string.s_hapus_dari_antrean))
             }
         }
     }
@@ -510,9 +512,9 @@ private fun EmptyQueue() {
             modifier = Modifier.size(48.dp)
         )
         Spacer(Modifier.height(10.dp))
-        Text("Antrean masih kosong", style = MaterialTheme.typography.titleSmall)
+        Text(tr(R.string.s_antrean_masih_kosong), style = MaterialTheme.typography.titleSmall)
         Text(
-            "Pilih file, tempel clipboard, atau bagikan dari aplikasi lain ke Kirimly.",
+            tr(R.string.s_pilih_file_tempel_clipboard_atau),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -526,10 +528,10 @@ private fun PinEntryDialog(peer: PeerDevice, onDismiss: () -> Unit, onConfirm: (
     var pin by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("PIN ${peer.name}") },
+        title = { Text(tr(R.string.s_pin, peer.name)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Masukkan PIN 4 digit yang tampil di layar Terima perangkat tujuan.")
+                Text(tr(R.string.s_masukkan_pin_4_digit_yang))
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { value -> pin = value.filter { it.isDigit() }.take(4) },
@@ -543,9 +545,9 @@ private fun PinEntryDialog(peer: PeerDevice, onDismiss: () -> Unit, onConfirm: (
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(pin) }, enabled = pin.length == 4) { Text("Kirim") }
+            Button(onClick = { onConfirm(pin) }, enabled = pin.length == 4) { Text(tr(R.string.s_kirim)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr(R.string.s_batal)) } }
     )
 }
 
@@ -558,19 +560,19 @@ private fun IsolationBanner(names: List<String>, onUseHotspot: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "Wi-Fi ini tampaknya memblokir koneksi antarperangkat",
+                tr(R.string.s_wi_fi_ini_tampaknya_memblokir),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Text(
-                names.joinToString(", ") + " terlihat di jaringan, tetapi tidak bisa dihubungi. " +
-                    "Ini biasa terjadi di Wi-Fi kantor, kampus, atau kafe (client isolation). " +
-                    "Gunakan hotspot lokal dari salah satu HP.",
+                names.joinToString(", ") + tr(R.string.s_terlihat_di_jaringan_tetapi_tidak) +
+                    tr(R.string.s_ini_biasa_terjadi_di_wi) +
+                    tr(R.string.s_gunakan_hotspot_lokal_dari_salah),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             TextButton(onClick = onUseHotspot, contentPadding = PaddingValues(0.dp)) {
-                Text("Buka hotspot lokal di tab Terima")
+                Text(tr(R.string.s_buka_hotspot_lokal_di_tab))
             }
         }
     }
@@ -587,7 +589,7 @@ private fun BrowsersCard(browsers: List<ConnectedBrowser>, hasQueue: Boolean, on
     ) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             Text(
-                "Safari terhubung",
+                tr(R.string.s_safari_terhubung),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
@@ -605,7 +607,7 @@ private fun BrowsersCard(browsers: List<ConnectedBrowser>, hasQueue: Boolean, on
                         Text(browser.name, style = MaterialTheme.typography.bodyMedium)
                         Text(browser.address, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    FilledTonalButton(onClick = { onOffer(browser) }, enabled = hasQueue) { Text("Kirim antrean") }
+                    FilledTonalButton(onClick = { onOffer(browser) }, enabled = hasQueue) { Text(tr(R.string.s_kirim_antrean)) }
                 }
             }
         }

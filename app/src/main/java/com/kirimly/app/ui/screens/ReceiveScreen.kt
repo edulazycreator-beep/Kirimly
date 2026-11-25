@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.screens
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.border
@@ -108,7 +110,7 @@ fun ReceiveScreen(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         if (results.values.all { it }) viewModel.startHotspot()
-        else viewModel.showMessage("Izin ditolak — gunakan hotspot sistem dan isi SSID manual.")
+        else viewModel.showMessage(tr(R.string.s_izin_ditolak_gunakan_hotspot_sistem))
     }
 
     val wifiJoinState by viewModel.wifiJoinState.collectAsStateWithLifecycle()
@@ -128,9 +130,9 @@ fun ReceiveScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Terima", style = MaterialTheme.typography.headlineSmall)
+                        Text(tr(R.string.s_terima), style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            "Dari iPhone, iPad, atau Android",
+                            tr(R.string.s_dari_iphone_ipad_atau_android),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -138,7 +140,7 @@ fun ReceiveScreen(
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Palette, contentDescription = "Tema & pengaturan")
+                        Icon(Icons.Rounded.Palette, contentDescription = tr(R.string.s_tema_pengaturan))
                     }
                 },
                 scrollBehavior = scrollBehavior
@@ -170,8 +172,8 @@ fun ReceiveScreen(
                     onModeChange = viewModel::setQrMode,
                     serverUrl = qrServerUrl,
                     wifiPayload = wifiPayload,
-                    serverCaption = "Pindai dengan Kamera iPhone, lalu buka di Safari.\nPerangkat harus di jaringan Wi-Fi yang sama.",
-                    wifiCaption = "Langkah 1 — pindai dengan Kamera iPhone untuk bergabung ke hotspot HP ini."
+                    serverCaption = tr(R.string.s_pindai_dengan_kamera_iphone_lalu),
+                    wifiCaption = tr(R.string.s_langkah_1_pindai_dengan_kamera)
                 ) {
                     HotspotControls(
                         state = hotspotState,
@@ -204,7 +206,7 @@ fun ReceiveScreen(
 
             if (running != null && !running.hasNetwork) {
                 item(key = "noNetwork") {
-                    InfoBanner("Tidak ada jaringan Wi-Fi atau hotspot terdeteksi. Sambungkan ke Wi-Fi atau aktifkan hotspot lokal.")
+                    InfoBanner(tr(R.string.s_tidak_ada_jaringan_wi_fi))
                 }
             }
 
@@ -224,9 +226,9 @@ fun ReceiveScreen(
                             .fillMaxWidth()
                             .padding(top = 8.dp)
                     ) {
-                        Text("Transfer aktif", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Text(tr(R.string.s_transfer_aktif), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                         if (transfers.any { it.isFinished }) {
-                            TextButton(onClick = viewModel::clearFinishedTransfers) { Text("Bersihkan") }
+                            TextButton(onClick = viewModel::clearFinishedTransfers) { Text(tr(R.string.s_bersihkan)) }
                         }
                     }
                 }
@@ -278,19 +280,19 @@ private fun ServerStatusCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = when (serverState) {
-                            is ServerState.Running -> "Server aktif"
-                            ServerState.Starting -> "Menyalakan…"
-                            is ServerState.Error -> "Server bermasalah"
-                            ServerState.Stopped -> "Server nonaktif"
+                            is ServerState.Running -> tr(R.string.s_server_aktif)
+                            ServerState.Starting -> tr(R.string.s_menyalakan)
+                            is ServerState.Error -> tr(R.string.s_server_bermasalah)
+                            ServerState.Stopped -> tr(R.string.s_server_nonaktif)
                         },
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
                         text = when (serverState) {
-                            is ServerState.Running -> "Siap menerima file & teks"
-                            ServerState.Starting -> "Mencari port kosong"
+                            is ServerState.Running -> tr(R.string.s_siap_menerima_file_teks)
+                            ServerState.Starting -> tr(R.string.s_mencari_port_kosong)
                             is ServerState.Error -> serverState.message
-                            ServerState.Stopped -> "Nyalakan untuk mulai menerima"
+                            ServerState.Stopped -> tr(R.string.s_nyalakan_untuk_mulai_menerima)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -304,7 +306,7 @@ private fun ServerStatusCard(
                     FilledTonalIconButton(onClick = onToggle, modifier = Modifier.size(52.dp)) {
                         Icon(
                             imageVector = Icons.Rounded.PowerSettingsNew,
-                            contentDescription = if (running != null) "Matikan server" else "Nyalakan server"
+                            contentDescription = if (running != null) tr(R.string.s_matikan_server) else tr(R.string.s_nyalakan_server)
                         )
                     }
                 }
@@ -328,7 +330,7 @@ private fun ServerStatusCard(
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(onClick = { onCopy(running.url) }) {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = "Salin alamat")
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = tr(R.string.s_salin_alamat))
                         }
                     }
                 }
@@ -351,16 +353,16 @@ private fun ServerStatusCard(
                             )
                             Spacer(Modifier.size(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("PIN sesi", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(tr(R.string.s_pin_sesi), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
-                                    text = if (pinRequired) pin else "Nonaktif",
+                                    text = if (pinRequired) pin else tr(R.string.s_nonaktif),
                                     style = if (pinRequired) MonoDigits else MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             if (pinRequired) {
                                 IconButton(onClick = onRefreshPin) {
-                                    Icon(Icons.Rounded.Refresh, contentDescription = "PIN baru")
+                                    Icon(Icons.Rounded.Refresh, contentDescription = tr(R.string.s_pin_baru))
                                 }
                             }
                         }
@@ -377,7 +379,7 @@ private fun ServerStatusCard(
                 ) {
                     Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text("Mulai Server")
+                    Text(tr(R.string.s_mulai_server))
                 }
             }
         }
@@ -404,7 +406,7 @@ private fun ColumnScope.HotspotControls(
     when (state) {
         HotspotState.Idle -> {
             Text(
-                "Tanpa Wi-Fi? Buat hotspot lokal agar iPhone bisa terhubung langsung ke perangkat ini.",
+                tr(R.string.s_tanpa_wi_fi_buat_hotspot),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -412,23 +414,23 @@ private fun ColumnScope.HotspotControls(
             Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                 Icon(Icons.Rounded.WifiTethering, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text("Aktifkan Hotspot Lokal")
+                Text(tr(R.string.s_aktifkan_hotspot_lokal))
             }
-            TextButton(onClick = onOpenSettings) { Text("Pakai hotspot sistem & isi manual") }
+            TextButton(onClick = onOpenSettings) { Text(tr(R.string.s_pakai_hotspot_sistem_isi_manual)) }
             ManualHotspotForm(ssid, { ssid = it }, password, { password = it }, onManual)
         }
         HotspotState.Starting -> {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
                 Spacer(Modifier.size(12.dp))
-                Text("Menyiapkan hotspot…", style = MaterialTheme.typography.bodyMedium)
+                Text(tr(R.string.s_menyiapkan_hotspot), style = MaterialTheme.typography.bodyMedium)
             }
         }
         is HotspotState.Active -> {
             CredentialsBox(ssid = state.ssid, password = state.password)
             StepTwo(serverUrl)
             OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
-                Text("Matikan Hotspot")
+                Text(tr(R.string.s_matikan_hotspot))
             }
         }
         is HotspotState.Manual -> {
@@ -438,10 +440,10 @@ private fun ColumnScope.HotspotControls(
                 OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Rounded.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
-                    Text("Pengaturan")
+                    Text(tr(R.string.s_pengaturan))
                 }
                 FilledTonalButton(onClick = onStop, modifier = Modifier.weight(1f)) {
-                    Text("Ubah")
+                    Text(tr(R.string.s_ubah))
                 }
             }
         }
@@ -449,17 +451,17 @@ private fun ColumnScope.HotspotControls(
             InfoBanner(state.reason)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = onReset, modifier = Modifier.weight(1f)) {
-                    Text("Coba lagi")
+                    Text(tr(R.string.s_coba_lagi))
                 }
                 FilledTonalButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) {
-                    Text("Hotspot sistem")
+                    Text(tr(R.string.s_hotspot_sistem))
                 }
             }
             ManualHotspotForm(ssid, { ssid = it }, password, { password = it }, onManual)
         }
     }
     if (!hasPayload && state is HotspotState.Active) {
-        Text("SSID tidak terbaca", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+        Text(tr(R.string.s_ssid_tidak_terbaca), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
     }
     if (state is HotspotState.Idle || state is HotspotState.Failed) {
         IphoneHotspotJoin(joinState = joinState, onJoin = onJoinIphone, onLeave = onLeaveIphone)
@@ -471,7 +473,7 @@ private fun ColumnScope.HotspotControls(
 private fun StepTwo(serverUrl: String?) {
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     Text(
-        "Langkah 2 — setelah iPhone tersambung, pindai ini untuk membuka Kirimly di Safari.",
+        tr(R.string.s_langkah_2_setelah_iphone_tersambung),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center
@@ -479,7 +481,7 @@ private fun StepTwo(serverUrl: String?) {
     if (serverUrl != null) {
         QrCodeImage(content = serverUrl)
     } else {
-        Text("Menunggu server aktif di hotspot…", style = MaterialTheme.typography.labelMedium)
+        Text(tr(R.string.s_menunggu_server_aktif_di_hotspot), style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -498,22 +500,22 @@ private fun IphoneHotspotJoin(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Atau gabung ke Personal Hotspot iPhone", style = MaterialTheme.typography.titleSmall)
+            Text(tr(R.string.s_atau_gabung_ke_personal_hotspot), style = MaterialTheme.typography.titleSmall)
             Text(
-                "Nyalakan Personal Hotspot di iPhone (aktifkan Maximise Compatibility), lalu isi nama dan sandinya. iPhone tetap memakai data seluler.",
+                tr(R.string.s_nyalakan_personal_hotspot_di_iphone),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             when (joinState) {
                 is WifiJoiner.State.Connected -> {
-                    Text("Tersambung ke ${joinState.ssid}. Pindai QR URL Safari dari iPhone.", style = MaterialTheme.typography.bodyMedium)
-                    OutlinedButton(onClick = onLeave, modifier = Modifier.fillMaxWidth()) { Text("Putuskan") }
+                    Text(tr(R.string.s_tersambung_ke_pindai_qr_url, joinState.ssid), style = MaterialTheme.typography.bodyMedium)
+                    OutlinedButton(onClick = onLeave, modifier = Modifier.fillMaxWidth()) { Text(tr(R.string.s_putuskan)) }
                 }
                 is WifiJoiner.State.Connecting -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.size(10.dp))
-                        Text("Menyambung ke ${joinState.ssid}… setujui dialog Android", style = MaterialTheme.typography.bodyMedium)
+                        Text(tr(R.string.s_menyambung_ke_setujui_dialog_android, joinState.ssid), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 else -> {
@@ -523,14 +525,14 @@ private fun IphoneHotspotJoin(
                     OutlinedTextField(
                         value = ssid,
                         onValueChange = { ssid = it },
-                        label = { Text("Nama hotspot iPhone") },
+                        label = { Text(tr(R.string.s_nama_hotspot_iphone)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Kata sandi") },
+                        label = { Text(tr(R.string.s_kata_sandi)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -540,7 +542,7 @@ private fun IphoneHotspotJoin(
                         onClick = { onJoin(ssid, password) },
                         enabled = ssid.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
-                    ) { Text("Gabung") }
+                    ) { Text(tr(R.string.s_gabung)) }
                 }
             }
         }
@@ -561,11 +563,11 @@ private fun ManualHotspotForm(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("QR Wi-Fi manual", style = MaterialTheme.typography.titleSmall)
+            Text(tr(R.string.s_qr_wi_fi_manual), style = MaterialTheme.typography.titleSmall)
             OutlinedTextField(
                 value = ssid,
                 onValueChange = onSsidChange,
-                label = { Text("Nama hotspot (SSID)") },
+                label = { Text(tr(R.string.s_nama_hotspot_ssid)) },
                 singleLine = true,
                 shape = RectangleShape,
                 modifier = Modifier.fillMaxWidth()
@@ -573,7 +575,7 @@ private fun ManualHotspotForm(
             OutlinedTextField(
                 value = password,
                 onValueChange = onPasswordChange,
-                label = { Text("Kata sandi") },
+                label = { Text(tr(R.string.s_kata_sandi)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -584,7 +586,7 @@ private fun ManualHotspotForm(
                 onClick = { onSubmit(ssid, password) },
                 enabled = ssid.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Buat QR Wi-Fi") }
+            ) { Text(tr(R.string.s_buat_qr_wi_fi)) }
         }
     }
 }
@@ -598,7 +600,7 @@ private fun CredentialsBox(ssid: String, password: String) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             LabeledValue("SSID", ssid)
-            LabeledValue("Kata sandi", password.ifEmpty { "(tanpa sandi)" })
+            LabeledValue(tr(R.string.s_kata_sandi), password.ifEmpty { tr(R.string.s_tanpa_sandi) })
         }
     }
 }
@@ -645,11 +647,11 @@ private fun HowToCard() {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Cara menerima dari iPhone", style = MaterialTheme.typography.titleMedium)
+            Text(tr(R.string.s_cara_menerima_dari_iphone), style = MaterialTheme.typography.titleMedium)
             listOf(
-                "Nyalakan server dan pastikan kedua perangkat di Wi-Fi yang sama (atau pindai QR hotspot).",
-                "Pindai QR URL Safari dengan Kamera iPhone, lalu masukkan PIN 4 digit.",
-                "Pilih file di Safari dan ketuk Kirim — setujui permintaan di layar ini."
+                tr(R.string.s_nyalakan_server_dan_pastikan_kedua),
+                tr(R.string.s_pindai_qr_url_safari_dengan),
+                tr(R.string.s_pilih_file_di_safari_dan)
             ).forEachIndexed { index, step ->
                 Row(verticalAlignment = Alignment.Top) {
                     Box(
@@ -708,11 +710,11 @@ private fun ConnectionNotes(localHostUrl: String?, onCopy: (String) -> Unit) {
                 modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Alamat untuk iPhone, iPad & Mac", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr(R.string.s_alamat_untuk_iphone_ipad_mac), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(localHostUrl, style = MaterialTheme.typography.titleSmall)
                 }
                 IconButton(onClick = { onCopy(localHostUrl) }) {
-                    Icon(Icons.Rounded.ContentCopy, contentDescription = "Salin alamat kirimly.local")
+                    Icon(Icons.Rounded.ContentCopy, contentDescription = tr(R.string.s_salin_alamat_kirimly_local))
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -726,8 +728,8 @@ private fun ConnectionNotes(localHostUrl: String?, onCopy: (String) -> Unit) {
             )
             Spacer(Modifier.size(12.dp))
             Text(
-                "Android ke Android terenkripsi end-to-end. Koneksi Safari memakai HTTP lokal tanpa enkripsi: " +
-                    "gunakan di jaringan yang kamu percayai, atau hotspot lokal dari HP ini.",
+                tr(R.string.s_android_ke_android_terenkripsi_end) +
+                    tr(R.string.s_gunakan_di_jaringan_yang_kamu),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

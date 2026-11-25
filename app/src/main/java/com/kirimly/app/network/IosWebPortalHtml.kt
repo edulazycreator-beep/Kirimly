@@ -165,6 +165,8 @@ textarea:focus, input.field:focus { border-color: var(--text); }
 .label { font-size: 13px; color: var(--muted); margin: 0 0 8px; display: block; }
 .footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--hairline); }
 #folderInput { display: none; }
+.ico img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ico { overflow: hidden; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .notice { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
 #keepAwake { display: none; }
@@ -259,6 +261,18 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     </div>
     <div id="pinError" class="err-text" role="alert"></div>
     <button id="pinSubmit" class="btn" type="button">Hubungkan</button>
+  </div>
+</div>
+
+<div id="offerModal" class="modal-back" role="dialog" aria-modal="true" aria-labelledby="offerTitle">
+  <div class="modal">
+    <h3 id="offerTitle">Android ingin mengirim</h3>
+    <p id="offerSub"></p>
+    <ul id="offerList" class="list" style="text-align:left;margin-bottom:16px"></ul>
+    <div class="actions">
+      <button id="offerDecline" class="btn ghost" type="button">Tolak</button>
+      <button id="offerAccept" class="btn" type="button">Unduh</button>
+    </div>
   </div>
 </div>
 
@@ -566,6 +580,13 @@ a.btn { text-align: center; text-decoration: none; display: block; }
       var ico = document.createElement('div');
       ico.className = 'ico';
       ico.textContent = item.type === 'text' ? 'TXT' : extOf(item.name);
+      if (item.type === 'file' && /^(image|video)[/]/.test(item.mimeType || '')) {
+        var img = document.createElement('img');
+        img.alt = '';
+        img.loading = 'lazy';
+        img.src = '/api/thumbnail/' + encodeURIComponent(item.id) + authQuery();
+        img.onload = function () { ico.textContent = ''; ico.appendChild(img); };
+      }
       var meta = document.createElement('div');
       meta.className = 'meta';
       if (item.type === 'text') {
@@ -598,6 +619,66 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     });
   }
 
+  /* ---------- Offers pushed from Android ---------- */
+  var currentOffer = null;
+
+  function wsSend(obj) {
+    try { if (state.ws && state.ws.readyState === 1) state.ws.send(JSON.stringify(obj)); } catch (e) { }
+  }
+
+  function showOffer(msg) {
+    var items = msg.items || [];
+    if (!items.length) return;
+    currentOffer = items;
+    el('offerTitle').textContent = (msg.message || 'Android') + ' ingin mengirim';
+    var total = items.reduce(function (a, it) { return a + (it.size > 0 ? it.size : 0); }, 0);
+    el('offerSub').textContent = items.length + ' item • ' + fmtSize(total);
+    var list = el('offerList');
+    list.innerHTML = '';
+    items.slice(0, 6).forEach(function (it) {
+      var li = document.createElement('li');
+      li.className = 'row';
+      var nm = document.createElement('div');
+      nm.className = 'name';
+      nm.textContent = it.type === 'text' ? (it.text || it.name) : it.name;
+      li.appendChild(nm);
+      list.appendChild(li);
+    });
+    if (items.length > 6) {
+      var more = document.createElement('li');
+      more.className = 'row size';
+      more.textContent = 'dan ' + (items.length - 6) + ' lainnya';
+      list.appendChild(more);
+    }
+    var onlyText = items.length === 1 && items[0].type === 'text';
+    el('offerAccept').textContent = onlyText ? 'Salin teks' : (items.length > 1 ? 'Unduh semua (ZIP)' : 'Unduh');
+    el('offerModal').className = 'modal-back show';
+    el('offerAccept').focus();
+  }
+
+  function hideOffer() { el('offerModal').className = 'modal-back'; currentOffer = null; }
+
+  el('offerDecline').addEventListener('click', function () { wsSend({ type: 'offer-declined' }); hideOffer(); });
+  el('offerAccept').addEventListener('click', function () {
+    var items = currentOffer || [];
+    hideOffer();
+    if (!items.length) return;
+    wsSend({ type: 'offer-accepted' });
+    if (items.length === 1 && items[0].type === 'text') { copyText(items[0].text || ''); return; }
+    var a = document.createElement('a');
+    if (items.length === 1) {
+      a.href = '/api/download/' + encodeURIComponent(items[0].id) + authQuery();
+      a.setAttribute('download', items[0].name);
+    } else {
+      a.href = '/api/download-all' + authQuery();
+      a.setAttribute('download', 'Kirimly.zip');
+    }
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    loadShared();
+  });
+
   el('refreshBtn').addEventListener('click', function () { if (state.authed) loadShared(); else loadInfo(); });
 
   /* ---------- WebSocket live updates ---------- */
@@ -605,13 +686,16 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     if (state.ws) { try { state.ws.close(); } catch (e) { } }
     var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
     var ws;
-    try { ws = new WebSocket(proto + location.host + '/ws' + authQuery()); } catch (e) { scheduleWs(); return; }
+    var q = authQuery();
+    q += (q ? '&' : '?') + 'name=' + encodeURIComponent(senderName());
+    try { ws = new WebSocket(proto + location.host + '/ws' + q); } catch (e) { scheduleWs(); return; }
     state.ws = ws;
     ws.onopen = function () { el('wsDot').className = 'dot on'; };
     ws.onmessage = function (ev) {
       var msg = {};
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       if (msg.type === 'shared-updated') loadShared();
+      if (msg.type === 'offer') showOffer(msg);
       if (msg.type === 'pin-changed' && !(state.info && state.info.trusted)) handleUnauthorized();
       if (msg.type === 'server-stopping') toast('Server Android dihentikan.', 'err');
       if (msg.type === 'address-changed') toast('Alamat Android berubah ke ' + msg.message + '. Pindai ulang QR jika halaman berhenti merespons.', 'err');

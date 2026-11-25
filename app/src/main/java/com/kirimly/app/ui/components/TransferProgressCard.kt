@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.components
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.animation.core.animateFloatAsState
@@ -85,8 +87,8 @@ fun TransferProgressCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = (if (progress.direction == TransferDirection.RECEIVED) "Dari " else "Ke ") + progress.peerName +
-                            if (progress.encrypted) " • terenkripsi" else "",
+                        text = (if (progress.direction == TransferDirection.RECEIVED) tr(R.string.s_dari) else "Ke ") + progress.peerName +
+                            if (progress.encrypted) tr(R.string.s_terenkripsi) else "",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -95,7 +97,7 @@ fun TransferProgressCard(
                 }
                 if (progress.isFinished) {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Tutup")
+                        Icon(Icons.Rounded.Close, contentDescription = tr(R.string.s_tutup))
                     }
                 } else {
                     Text(
@@ -123,11 +125,11 @@ fun TransferProgressCard(
                 Text(sizeText, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     text = when (progress.status) {
-                        TransferStatus.COMPLETED -> "Selesai • " + NetworkUtils.formatSpeed(progress.bytesPerSecond)
-                        TransferStatus.FAILED -> progress.errorMessage ?: "Gagal"
-                        TransferStatus.DECLINED -> "Ditolak"
-                        TransferStatus.AWAITING_APPROVAL -> "Menunggu persetujuan"
-                        TransferStatus.QUEUED -> "Dalam antrean"
+                        TransferStatus.COMPLETED -> tr(R.string.s_selesai) + NetworkUtils.formatSpeed(progress.bytesPerSecond)
+                        TransferStatus.FAILED -> progress.errorMessage ?: tr(R.string.s_gagal)
+                        TransferStatus.DECLINED -> tr(R.string.s_ditolak)
+                        TransferStatus.AWAITING_APPROVAL -> tr(R.string.s_menunggu_persetujuan)
+                        TransferStatus.QUEUED -> tr(R.string.s_dalam_antrean)
                         TransferStatus.IN_PROGRESS -> NetworkUtils.formatSpeed(progress.bytesPerSecond)
                     },
                     style = MaterialTheme.typography.labelMedium,

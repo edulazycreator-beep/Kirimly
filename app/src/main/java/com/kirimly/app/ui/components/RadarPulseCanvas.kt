@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.components
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
@@ -144,7 +146,7 @@ fun RadarPulseCanvas(
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Rounded.PhoneAndroid,
-                    contentDescription = "Perangkat ini",
+                    contentDescription = tr(R.string.s_perangkat_ini),
                     tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
@@ -206,7 +208,7 @@ private fun PeerBubble(peer: PeerDevice, onClick: () -> Unit) {
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Bluetooth,
-                        contentDescription = "Lewat Nearby, tanpa Wi-Fi bersama",
+                        contentDescription = tr(R.string.s_lewat_nearby_tanpa_wi_fi),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(3.dp)
                     )
@@ -222,7 +224,7 @@ private fun PeerBubble(peer: PeerDevice, onClick: () -> Unit) {
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Lock,
-                        contentDescription = "Memerlukan PIN",
+                        contentDescription = tr(R.string.s_memerlukan_pin),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(3.dp)
                     )

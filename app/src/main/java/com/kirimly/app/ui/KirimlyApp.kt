@@ -1,5 +1,6 @@
 package com.kirimly.app.ui
 
+import com.kirimly.app.util.tr
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import android.content.Intent
@@ -113,10 +114,10 @@ fun KirimlyApp(viewModel: MainViewModel) {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         if (results[Manifest.permission.POST_NOTIFICATIONS] == false) {
-            viewModel.showMessage("Notifikasi dimatikan — permintaan transfer hanya tampil saat aplikasi terbuka.")
+            viewModel.showMessage(tr(R.string.s_notifikasi_dimatikan_permintaan_transfer_hanya))
         }
         if (results[Manifest.permission.WRITE_EXTERNAL_STORAGE] == false) {
-            viewModel.showMessage("Izin penyimpanan diperlukan untuk menyimpan file di Android 8–9.")
+            viewModel.showMessage(tr(R.string.s_izin_penyimpanan_diperlukan_untuk_menyimpan))
         }
     }
     LaunchedEffect(Unit) {
@@ -290,9 +291,9 @@ fun KirimlyApp(viewModel: MainViewModel) {
                         .putExtra(Intent.EXTRA_SUBJECT, "Laporan crash Kirimly")
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     try {
-                        context.startActivity(Intent.createChooser(share, "Bagikan log crash"))
+                        context.startActivity(Intent.createChooser(share, tr(R.string.s_bagikan_log_crash)))
                     } catch (_: Exception) {
-                        viewModel.showMessage("Tidak ada aplikasi untuk membagikan log")
+                        viewModel.showMessage(tr(R.string.s_tidak_ada_aplikasi_untuk_membagikan))
                     }
                 }
             },
@@ -343,15 +344,15 @@ private fun ExitConfirmDialog(
         shape = RectangleShape,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         icon = { AnimatedKirimlyMark(modifier = Modifier.size(56.dp), floating = false) },
-        title = { Text("Keluar dari Kirimly?") },
+        title = { Text(tr(R.string.s_keluar_dari_kirimly)) },
         text = {
             Text(
                 text = when {
                     activeTransfers > 0 ->
-                        "Masih ada $activeTransfers transfer berjalan. Server tetap aktif di latar belakang jika kamu keluar tanpa mematikannya."
+                        tr(R.string.s_masih_ada_transfer_berjalan_server, activeTransfers)
                     serverRunning ->
-                        "Server masih aktif. Kamu bisa membiarkannya berjalan di latar belakang agar perangkat lain tetap bisa mengirim file."
-                    else -> "Kamu bisa membuka Kirimly lagi kapan saja."
+                        tr(R.string.s_server_masih_aktif_kamu_bisa)
+                    else -> tr(R.string.s_kamu_bisa_membuka_kirimly_lagi)
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -359,16 +360,16 @@ private fun ExitConfirmDialog(
         confirmButton = {
             if (serverRunning) {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onExit(true) }) { Text("Matikan server & keluar") }
-                    OutlinedButton(onClick = { onExit(false) }) { Text("Keluar, biarkan aktif") }
-                    TextButton(onClick = onDismiss) { Text("Batal") }
+                    Button(onClick = { onExit(true) }) { Text(tr(R.string.s_matikan_server_keluar)) }
+                    OutlinedButton(onClick = { onExit(false) }) { Text(tr(R.string.s_keluar_biarkan_aktif)) }
+                    TextButton(onClick = onDismiss) { Text(tr(R.string.s_batal)) }
                 }
             } else {
-                Button(onClick = { onExit(false) }) { Text("Keluar") }
+                Button(onClick = { onExit(false) }) { Text(tr(R.string.s_keluar)) }
             }
         },
         dismissButton = {
-            if (!serverRunning) TextButton(onClick = onDismiss) { Text("Batal") }
+            if (!serverRunning) TextButton(onClick = onDismiss) { Text(tr(R.string.s_batal)) }
         }
     )
 }

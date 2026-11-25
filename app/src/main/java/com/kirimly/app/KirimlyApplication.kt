@@ -1,5 +1,6 @@
 package com.kirimly.app
 
+import com.kirimly.app.util.AppText
 import android.app.Application
 import android.content.Context
 import com.kirimly.app.data.db.KirimlyDatabase
@@ -26,6 +27,7 @@ class KirimlyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppText.context = this
         CrashLogger.install(this)
         container = AppContainer(this)
     }

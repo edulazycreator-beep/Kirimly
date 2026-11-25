@@ -1,5 +1,7 @@
 package com.kirimly.app.network
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import android.content.Context
 import com.kirimly.app.data.db.TransferDao
 import com.kirimly.app.data.db.TransferRecordEntity
@@ -148,13 +150,13 @@ class PeerTransferClient(
                 }
                 when (response.status) {
                     HttpStatusCode.Unauthorized -> return@withContext PeerSendResult.PinRejected
-                    HttpStatusCode.TooManyRequests -> return@withContext PeerSendResult.Failed("Terlalu banyak percobaan PIN")
+                    HttpStatusCode.TooManyRequests -> return@withContext PeerSendResult.Failed(tr(R.string.s_terlalu_banyak_percobaan_pin))
                     HttpStatusCode.Forbidden -> return@withContext PeerSendResult.Declined
                     HttpStatusCode.RequestTimeout -> return@withContext PeerSendResult.Timeout
                     else -> Unit
                 }
                 if (!response.status.isSuccess()) {
-                    return@withContext PeerSendResult.Failed("Server membalas ${response.status.value}")
+                    return@withContext PeerSendResult.Failed(tr(R.string.s_server_membalas, response.status.value))
                 }
                 val approval = response.body<UploadRequestResponse>()
                 val token = approval.token
@@ -195,10 +197,10 @@ class PeerTransferClient(
             if (sentFiles == files.size && sentTexts == texts.size) {
                 PeerSendResult.Success(sentFiles, sentTexts, encrypted)
             } else {
-                PeerSendResult.Failed("${sentFiles + sentTexts} dari ${files.size + texts.size} item terkirim")
+                PeerSendResult.Failed(tr(R.string.s_dari_item_terkirim, sentFiles + sentTexts, files.size + texts.size))
             }
         } catch (e: Exception) {
-            PeerSendResult.Failed(e.message ?: "Koneksi ke ${peer.name} gagal")
+            PeerSendResult.Failed(e.message ?: tr(R.string.s_koneksi_ke_gagal, peer.name))
         } finally {
             onVerificationCode(null)
         }
@@ -217,13 +219,13 @@ class PeerTransferClient(
             digest.reset()
             position = 0L
             val input = context.contentResolver.openInputStream(file.uri)
-                ?: throw IOException("Tidak dapat membaca ${file.displayName}")
+                ?: throw IOException(tr(R.string.s_tidak_dapat_membaca, file.displayName))
             stream = input
             val buffer = ByteArray(64 * 1024)
             while (position < offset) {
                 val want = minOf(buffer.size.toLong(), offset - position).toInt()
                 val read = input.read(buffer, 0, want)
-                if (read == -1) throw IOException("File sumber lebih pendek dari offset")
+                if (read == -1) throw IOException(tr(R.string.s_file_sumber_lebih_pendek_dari))
                 digest.update(buffer, 0, read)
                 position += read
             }
@@ -231,7 +233,7 @@ class PeerTransferClient(
 
         /** Fills [buffer] as far as possible; returns bytes read (0 at end of file). */
         fun read(buffer: ByteArray): Int {
-            val input = stream ?: throw IOException("Stream belum dibuka")
+            val input = stream ?: throw IOException(tr(R.string.s_stream_belum_dibuka))
             var filled = 0
             while (filled < buffer.size) {
                 val read = input.read(buffer, filled, buffer.size - filled)
@@ -280,10 +282,10 @@ class PeerTransferClient(
                         )
                     )
                 }
-                if (!response.status.isSuccess()) throw IOException("Init gagal (${response.status.value})")
+                if (!response.status.isSuccess()) throw IOException(tr(R.string.s_init_gagal, response.status.value))
                 response.body<UploadInitResponse>()
             }
-            if (key != null && !init.encrypted) throw IOException("Peer menolak enkripsi")
+            if (key != null && !init.encrypted) throw IOException(tr(R.string.s_peer_menolak_enkripsi))
 
             val chunkSize = init.chunkSize.coerceIn(256 * 1024, 8 * 1024 * 1024)
             val buffer = ByteArray(chunkSize)
@@ -319,11 +321,11 @@ class PeerTransferClient(
                 } catch (e: Exception) {
                     if (++failures > MAX_RETRIES) throw e
                     delay(backoff(failures))
-                    serverOffset(base, init.uploadId) ?: throw IOException("Sesi upload hilang")
+                    serverOffset(base, init.uploadId) ?: throw IOException(tr(R.string.s_sesi_upload_hilang))
                 }
                 if (outcome != null) {
                     // Server is elsewhere (lost reply or rejected chunk): resume from its offset.
-                    if (++failures > MAX_RETRIES) throw IOException("Chunk terus ditolak")
+                    if (++failures > MAX_RETRIES) throw IOException(tr(R.string.s_chunk_terus_ditolak))
                     reader.seekTo(outcome)
                 }
             }
@@ -339,11 +341,11 @@ class PeerTransferClient(
                 if (response.status == HttpStatusCode.UnprocessableEntity) {
                     return@withRetry response.body<UploadCompleteResponse>()
                 }
-                if (!response.status.isSuccess()) throw IOException("Selesai gagal (${response.status.value})")
+                if (!response.status.isSuccess()) throw IOException(tr(R.string.s_selesai_gagal, response.status.value))
                 response.body<UploadCompleteResponse>()
             }
             if (!done.ok) {
-                tracker.finish(trackId, TransferStatus.FAILED, reader.position, done.message ?: "Verifikasi gagal")
+                tracker.finish(trackId, TransferStatus.FAILED, reader.position, done.message ?: tr(R.string.s_verifikasi_gagal))
                 return false
             }
             tracker.finish(trackId, TransferStatus.COMPLETED, reader.position)
@@ -359,7 +361,7 @@ class PeerTransferClient(
             )
             return true
         } catch (e: Exception) {
-            tracker.finish(trackId, TransferStatus.FAILED, reader.position, e.message ?: "Upload gagal")
+            tracker.finish(trackId, TransferStatus.FAILED, reader.position, e.message ?: tr(R.string.s_upload_gagal))
             return false
         } finally {
             reader.close()
@@ -415,7 +417,7 @@ class PeerTransferClient(
                                 size = file.sizeBytes.takeIf { it >= 0L }
                             ) {
                                 val stream = context.contentResolver.openInputStream(file.uri)
-                                    ?: throw IOException("Tidak dapat membaca ${file.displayName}")
+                                    ?: throw IOException(tr(R.string.s_tidak_dapat_membaca, file.displayName))
                                 stream.asInput()
                             }
                         }
@@ -445,7 +447,7 @@ class PeerTransferClient(
                 false
             }
         } catch (e: Exception) {
-            tracker.finish(trackId, TransferStatus.FAILED, errorMessage = e.message ?: "Upload gagal")
+            tracker.finish(trackId, TransferStatus.FAILED, errorMessage = e.message ?: tr(R.string.s_upload_gagal))
             false
         }
     }

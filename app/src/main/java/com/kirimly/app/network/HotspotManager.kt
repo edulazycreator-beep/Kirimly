@@ -1,5 +1,7 @@
 package com.kirimly.app.network
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -42,13 +44,13 @@ class HotspotManager(context: Context) {
         if (reservation != null) return
         val manager = wifiManager
         if (manager == null) {
-            _state.value = HotspotState.Failed("Perangkat ini tidak mendukung Wi-Fi.")
+            _state.value = HotspotState.Failed(tr(R.string.s_perangkat_ini_tidak_mendukung_wi))
             return
         }
         if (!hasPermission()) {
             _state.value = HotspotState.Failed(
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) "Izin Perangkat Wi-Fi Terdekat diperlukan."
-                else "Izin lokasi diperlukan untuk hotspot lokal."
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) tr(R.string.s_izin_perangkat_wi_fi_terdekat)
+                else tr(R.string.s_izin_lokasi_diperlukan_untuk_hotspot)
             )
             return
         }
@@ -61,7 +63,7 @@ class HotspotManager(context: Context) {
                     _state.value = if (credentials != null) {
                         HotspotState.Active(credentials.first, credentials.second)
                     } else {
-                        HotspotState.Failed("Hotspot aktif, tetapi SSID tidak dapat dibaca. Masukkan manual.")
+                        HotspotState.Failed(tr(R.string.s_hotspot_aktif_tetapi_ssid_tidak))
                     }
                 }
 
@@ -78,9 +80,9 @@ class HotspotManager(context: Context) {
         } catch (e: SecurityException) {
             _state.value = HotspotState.Failed("Izin ditolak: ${e.message ?: "akses Wi-Fi"}")
         } catch (e: IllegalStateException) {
-            _state.value = HotspotState.Failed("Hotspot sudah berjalan oleh aplikasi lain.")
+            _state.value = HotspotState.Failed(tr(R.string.s_hotspot_sudah_berjalan_oleh_aplikasi))
         } catch (e: Exception) {
-            _state.value = HotspotState.Failed(e.message ?: "Hotspot lokal tidak tersedia.")
+            _state.value = HotspotState.Failed(e.message ?: tr(R.string.s_hotspot_lokal_tidak_tersedia))
         }
     }
 
@@ -130,10 +132,10 @@ class HotspotManager(context: Context) {
     }
 
     private fun reasonToText(reason: Int): String = when (reason) {
-        WifiManager.LocalOnlyHotspotCallback.ERROR_NO_CHANNEL -> "Tidak ada kanal Wi-Fi yang tersedia."
+        WifiManager.LocalOnlyHotspotCallback.ERROR_NO_CHANNEL -> tr(R.string.s_tidak_ada_kanal_wi_fi)
         WifiManager.LocalOnlyHotspotCallback.ERROR_INCOMPATIBLE_MODE ->
-            "Matikan hotspot/tethering sistem terlebih dahulu, atau gunakan hotspot sistem secara manual."
-        WifiManager.LocalOnlyHotspotCallback.ERROR_TETHERING_DISALLOWED -> "Tethering dinonaktifkan oleh kebijakan perangkat."
-        else -> "Hotspot lokal gagal dimulai. Pastikan Wi-Fi dan Lokasi aktif."
+            tr(R.string.s_matikan_hotspot_tethering_sistem_terlebih)
+        WifiManager.LocalOnlyHotspotCallback.ERROR_TETHERING_DISALLOWED -> tr(R.string.s_tethering_dinonaktifkan_oleh_kebijakan_perangkat)
+        else -> tr(R.string.s_hotspot_lokal_gagal_dimulai_pastikan)
     }
 }

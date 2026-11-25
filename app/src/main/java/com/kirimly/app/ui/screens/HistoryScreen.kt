@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.screens
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import com.kirimly.app.ui.components.FileThumbnail
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
@@ -100,9 +102,9 @@ fun HistoryScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Riwayat", style = MaterialTheme.typography.headlineSmall)
+                        Text(tr(R.string.s_riwayat), style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            "Semua file & teks yang pernah ditransfer",
+                            tr(R.string.s_semua_file_teks_yang_pernah),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -110,15 +112,15 @@ fun HistoryScreen(
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Palette, contentDescription = "Tema & palet warna")
+                        Icon(Icons.Rounded.Palette, contentDescription = tr(R.string.s_tema_palet_warna))
                     }
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "Menu lainnya")
+                            Icon(Icons.Rounded.MoreVert, contentDescription = tr(R.string.s_menu_lainnya))
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text("Hapus semua riwayat") },
+                                text = { Text(tr(R.string.s_hapus_semua_riwayat)) },
                                 leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
                                 onClick = {
                                     menuOpen = false
@@ -143,12 +145,12 @@ fun HistoryScreen(
                 OutlinedTextField(
                     value = query,
                     onValueChange = viewModel::setHistoryQuery,
-                    placeholder = { Text("Cari nama file, teks, atau perangkat") },
+                    placeholder = { Text(tr(R.string.s_cari_nama_file_teks_atau)) },
                     leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
                             IconButton(onClick = { viewModel.setHistoryQuery("") }) {
-                                Icon(Icons.Rounded.Clear, contentDescription = "Hapus pencarian")
+                                Icon(Icons.Rounded.Clear, contentDescription = tr(R.string.s_hapus_pencarian))
                             }
                         }
                     },
@@ -199,15 +201,15 @@ fun HistoryScreen(
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("Hapus semua riwayat?") },
-            text = { Text("Catatan transfer akan dihapus. File yang sudah tersimpan di Downloads/Kirimly tidak ikut terhapus.") },
+            title = { Text(tr(R.string.s_hapus_semua_riwayat_2)) },
+            text = { Text(tr(R.string.s_catatan_transfer_akan_dihapus_file)) },
             confirmButton = {
                 Button(onClick = {
                     confirmClear = false
                     viewModel.clearHistory()
-                }) { Text("Hapus") }
+                }) { Text(tr(R.string.s_hapus)) }
             },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Batal") } }
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(tr(R.string.s_batal)) } }
         )
     }
 }
@@ -247,7 +249,7 @@ private fun HistoryRow(
                     ) {
                         Icon(
                             imageVector = if (received) Icons.Rounded.ArrowDownward else Icons.Rounded.ArrowUpward,
-                            contentDescription = if (received) "Diterima" else "Dikirim",
+                            contentDescription = if (received) tr(R.string.s_diterima) else tr(R.string.s_dikirim),
                             tint = if (received) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(2.dp)
                         )
@@ -266,7 +268,7 @@ private fun HistoryRow(
                     )
                     Text(
                         text = listOf(
-                            if (item.isText) "Teks" else NetworkUtils.formatFileSize(item.sizeBytes),
+                            if (item.isText) tr(R.string.s_teks) else NetworkUtils.formatFileSize(item.sizeBytes),
                             (if (received) "dari " else "ke ") + item.peerName,
                             formatTimestamp(item.timestamp)
                         ).joinToString(" • "),
@@ -278,11 +280,11 @@ private fun HistoryRow(
                 }
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "Opsi")
+                        Icon(Icons.Rounded.MoreVert, contentDescription = tr(R.string.s_opsi))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text("Bagikan") },
+                            text = { Text(tr(R.string.s_bagikan)) },
                             leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
                             onClick = {
                                 menuOpen = false
@@ -290,7 +292,7 @@ private fun HistoryRow(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Hapus dari riwayat") },
+                            text = { Text(tr(R.string.s_hapus_dari_riwayat)) },
                             leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
                             onClick = {
                                 menuOpen = false
@@ -307,13 +309,13 @@ private fun HistoryRow(
                     FilledTonalButton(onClick = onCopy) {
                         Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
-                        Text("Salin Teks")
+                        Text(tr(R.string.s_salin_teks))
                     }
                 } else {
                     FilledTonalButton(onClick = onOpen, enabled = item.uri != null) {
                         Icon(Icons.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
-                        Text("Buka File")
+                        Text(tr(R.string.s_buka_file))
                     }
                 }
             }
@@ -337,11 +339,11 @@ private fun EmptyHistory(isFiltered: Boolean) {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            if (isFiltered) "Tidak ada hasil" else "Belum ada riwayat",
+            if (isFiltered) tr(R.string.s_tidak_ada_hasil) else tr(R.string.s_belum_ada_riwayat),
             style = MaterialTheme.typography.titleMedium
         )
         Text(
-            if (isFiltered) "Coba kata kunci atau filter lain." else "File dan teks yang kamu kirim atau terima akan muncul di sini.",
+            if (isFiltered) tr(R.string.s_coba_kata_kunci_atau_filter) else tr(R.string.s_file_dan_teks_yang_kamu),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -350,12 +352,12 @@ private fun EmptyHistory(isFiltered: Boolean) {
     }
 }
 
-private val timeFormat = SimpleDateFormat("HH:mm", Locale.forLanguageTag("id-ID"))
-private val dateFormat = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.forLanguageTag("id-ID"))
+private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+private val dateFormat = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault())
 
 private fun formatTimestamp(timestamp: Long): String {
     val date = Date(timestamp)
-    return if (DateUtils.isToday(timestamp)) "Hari ini " + timeFormat.format(date) else dateFormat.format(date)
+    return if (DateUtils.isToday(timestamp)) tr(R.string.s_hari_ini) + timeFormat.format(date) else dateFormat.format(date)
 }
 
 private fun openItem(context: Context, item: TransferItem, viewModel: MainViewModel) {
@@ -364,11 +366,11 @@ private fun openItem(context: Context, item: TransferItem, viewModel: MainViewMo
         .setDataAndType(uri, item.mimeType.ifBlank { "*/*" })
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
     try {
-        context.startActivity(Intent.createChooser(intent, "Buka dengan").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent.createChooser(intent, tr(R.string.s_buka_dengan)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: ActivityNotFoundException) {
-        viewModel.showMessage("Tidak ada aplikasi untuk membuka file ini")
+        viewModel.showMessage(tr(R.string.s_tidak_ada_aplikasi_untuk_membuka))
     } catch (e: SecurityException) {
-        viewModel.showMessage("Akses ke file sudah tidak tersedia")
+        viewModel.showMessage(tr(R.string.s_akses_ke_file_sudah_tidak))
     }
 }
 
@@ -384,8 +386,8 @@ private fun shareItem(context: Context, item: TransferItem, viewModel: MainViewM
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     try {
-        context.startActivity(Intent.createChooser(intent, "Bagikan").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent.createChooser(intent, tr(R.string.s_bagikan)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: Exception) {
-        viewModel.showMessage("Tidak dapat membagikan item ini")
+        viewModel.showMessage(tr(R.string.s_tidak_dapat_membagikan_item_ini))
     }
 }

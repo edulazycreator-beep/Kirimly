@@ -1,5 +1,6 @@
 package com.kirimly.app.service
 
+import com.kirimly.app.util.tr
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -167,7 +168,7 @@ class TransferForegroundService : Service() {
         val builder = NotificationCompat.Builder(this, CHANNEL_STATUS)
             .setSmallIcon(R.drawable.ic_stat_kirimly)
             .setContentTitle(title)
-            .setContentText(detail ?: "Buka Kirimly untuk melihat QR dan PIN")
+            .setContentText(detail ?: tr(R.string.s_buka_kirimly_untuk_melihat_qr))
             .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -212,7 +213,7 @@ class TransferForegroundService : Service() {
         )
         val body = getString(R.string.notif_request_body, request.files.size, NetworkUtils.formatFileSize(request.totalSize))
         val fileList = request.files.take(5).joinToString("\n") { "• ${it.name}" } +
-            if (request.files.size > 5) "\n…dan ${request.files.size - 5} lainnya" else ""
+            if (request.files.size > 5) tr(R.string.s_n_dan_lainnya, request.files.size - 5) else ""
         return NotificationCompat.Builder(this, CHANNEL_REQUESTS)
             .setSmallIcon(R.drawable.ic_stat_kirimly)
             .setContentTitle(getString(R.string.notif_request_title, request.deviceName))

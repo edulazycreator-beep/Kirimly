@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.components
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.compose.material3.Button
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.toggleable
@@ -104,10 +106,10 @@ fun PalettePickerSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Text("Tampilan & Pengaturan", style = MaterialTheme.typography.titleLarge)
+            Text(tr(R.string.s_tampilan_pengaturan), style = MaterialTheme.typography.titleLarge)
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionLabel("Mode tema")
+                SectionLabel(tr(R.string.s_mode_tema))
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     ThemeMode.entries.forEachIndexed { index, mode ->
                         SegmentedButton(
@@ -131,7 +133,7 @@ fun PalettePickerSheet(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionLabel("Palet warna")
+                SectionLabel(tr(R.string.s_palet_warna))
                 AppPalette.entries.forEach { palette ->
                     PaletteRow(
                         palette = palette,
@@ -143,13 +145,13 @@ fun PalettePickerSheet(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionLabel("Nama perangkat")
+                SectionLabel(tr(R.string.s_nama_perangkat))
                 OutlinedTextField(
                     value = nickname,
                     onValueChange = { nickname = it.take(UserPreferencesRepository.MAX_NICKNAME_LENGTH) },
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Rounded.Smartphone, contentDescription = null) },
-                    supportingText = { Text("Terlihat oleh perangkat lain di radar dan di Safari") },
+                    supportingText = { Text(tr(R.string.s_terlihat_oleh_perangkat_lain_di)) },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
                         if (nickname.isNotBlank()) onNicknameChange(nickname)
@@ -162,7 +164,7 @@ fun PalettePickerSheet(
                     TextButton(onClick = {
                         onNicknameChange(nickname)
                         focusManager.clearFocus()
-                    }) { Text("Simpan nama") }
+                    }) { Text(tr(R.string.s_simpan_nama)) }
                 }
             }
 
@@ -176,9 +178,9 @@ fun PalettePickerSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Wajibkan PIN", style = MaterialTheme.typography.titleSmall)
+                        Text(tr(R.string.s_wajibkan_pin), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "Perangkat lain harus memasukkan PIN 4 digit sebelum mengirim atau mengunduh.",
+                            tr(R.string.s_perangkat_lain_harus_memasukkan_pin),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -190,33 +192,33 @@ fun PalettePickerSheet(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Transfer")
                 SettingSwitch(
-                    title = "Server otomatis aktif",
-                    body = "Nyalakan server setiap kali Kirimly dibuka, jadi perangkat ini langsung siap menerima.",
+                    title = tr(R.string.s_server_otomatis_aktif),
+                    body = tr(R.string.s_nyalakan_server_setiap_kali_kirimly),
                     checked = preferences.autoStartServer,
                     onCheckedChange = onAutoStartChange
                 )
                 SettingSwitch(
-                    title = "Sertakan PIN di QR",
-                    body = "Pemindai QR langsung masuk tanpa mengetik PIN. Siapa pun yang memotret layar ini juga bisa masuk.",
+                    title = tr(R.string.s_sertakan_pin_di_qr),
+                    body = tr(R.string.s_pemindai_qr_langsung_masuk_tanpa),
                     checked = preferences.pinInQr,
                     onCheckedChange = onPinInQrChange
                 )
                 SettingSwitch(
-                    title = "Ubah foto HEIC ke JPG",
-                    body = "Foto iPhone disimpan sebagai JPG agar terbuka di semua aplikasi (Android 9+). File HEIC asli dihapus.",
+                    title = tr(R.string.s_ubah_foto_heic_ke_jpg),
+                    body = tr(R.string.s_foto_iphone_disimpan_sebagai_jpg),
                     checked = preferences.convertHeic,
                     onCheckedChange = onConvertHeicChange
                 )
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionLabel("Matikan server saat menganggur")
+                SectionLabel(tr(R.string.s_matikan_server_saat_menganggur))
                 Text(
-                    "Saat Kirimly di latar belakang dan tidak ada transfer, server dimatikan untuk menghemat baterai.",
+                    tr(R.string.s_saat_kirimly_di_latar_belakang),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                val options = listOf(0 to "Tidak", 5 to "5 m", 15 to "15 m", 30 to "30 m", 60 to "60 m")
+                val options = listOf(0 to tr(R.string.s_tidak), 5 to "5 m", 15 to "15 m", 30 to "30 m", 60 to "60 m")
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     options.forEachIndexed { index, (minutes, label) ->
                         SegmentedButton(
@@ -230,10 +232,10 @@ fun PalettePickerSheet(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionLabel("Perangkat tepercaya")
+                SectionLabel(tr(R.string.s_perangkat_tepercaya))
                 if (preferences.trustedDevices.isEmpty()) {
                     Text(
-                        "Belum ada. Centang \"Percayai perangkat ini\" saat menerima kiriman agar perangkat itu tidak perlu PIN lagi.",
+                        tr(R.string.s_belum_ada_centang_percayai_perangkat),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -254,24 +256,24 @@ fun PalettePickerSheet(
                                     .weight(1f)
                                     .padding(horizontal = 12.dp)
                             )
-                            TextButton(onClick = { onRemoveTrusted(device.id) }) { Text("Hapus") }
+                            TextButton(onClick = { onRemoveTrusted(device.id) }) { Text(tr(R.string.s_hapus)) }
                         }
                     }
                 }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionLabel("Log crash")
+                SectionLabel(tr(R.string.s_log_crash))
                 Text(
-                    if (crashLogCount == 0) "Tidak ada crash tercatat. Log hanya disimpan di HP ini."
-                    else "$crashLogCount crash tercatat. Bagikan ke pengembang untuk membantu perbaikan.",
+                    if (crashLogCount == 0) tr(R.string.s_tidak_ada_crash_tercatat_log)
+                    else tr(R.string.s_crash_tercatat_bagikan_ke_pengembang, crashLogCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (crashLogCount > 0) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(onClick = onClearCrashLogs, modifier = Modifier.weight(1f)) { Text("Hapus") }
-                        Button(onClick = onShareCrashLogs, modifier = Modifier.weight(1f)) { Text("Bagikan log") }
+                        OutlinedButton(onClick = onClearCrashLogs, modifier = Modifier.weight(1f)) { Text(tr(R.string.s_hapus)) }
+                        Button(onClick = onShareCrashLogs, modifier = Modifier.weight(1f)) { Text(tr(R.string.s_bagikan_log)) }
                     }
                 }
             }
@@ -279,7 +281,7 @@ fun PalettePickerSheet(
             OutlinedButton(onClick = onShowTutorial, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Rounded.School, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("Lihat tutorial lagi")
+                Text(tr(R.string.s_lihat_tutorial_lagi))
             }
             Spacer(Modifier.height(4.dp))
         }
@@ -330,7 +332,7 @@ private fun PaletteRow(palette: AppPalette, selected: Boolean, dark: Boolean, on
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = "Dipilih",
+                    contentDescription = tr(R.string.s_dipilih),
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(16.dp)
                 )

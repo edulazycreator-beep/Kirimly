@@ -1,5 +1,7 @@
 package com.kirimly.app.network
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -34,7 +36,7 @@ class WifiJoiner(context: Context) {
 
     fun join(ssid: String, password: String, onConnected: () -> Unit) {
         if (!supported) {
-            _state.value = State.Failed("Butuh Android 10 atau lebih baru")
+            _state.value = State.Failed(tr(R.string.s_butuh_android_10_atau_lebih))
             return
         }
         disconnect()
@@ -44,7 +46,7 @@ class WifiJoiner(context: Context) {
     private fun attempt(ssid: String, password: String, useWpa3: Boolean, onConnected: () -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
         val manager = connectivity ?: run {
-            _state.value = State.Failed("Wi-Fi tidak tersedia")
+            _state.value = State.Failed(tr(R.string.s_wi_fi_tidak_tersedia))
             return
         }
         _state.value = State.Connecting(ssid)
@@ -69,19 +71,19 @@ class WifiJoiner(context: Context) {
                     // Newer iPhones use WPA3 unless "Maximise Compatibility" is on.
                     attempt(ssid, password, useWpa3 = true, onConnected = onConnected)
                 } else {
-                    _state.value = State.Failed("Tidak bisa bergabung ke \"$ssid\". Periksa nama, kata sandi, dan nyalakan Maximise Compatibility di iPhone.")
+                    _state.value = State.Failed(tr(R.string.s_tidak_bisa_bergabung_ke_periksa, ssid))
                 }
             }
 
             override fun onLost(network: Network) {
-                _state.value = State.Failed("Koneksi ke $ssid terputus")
+                _state.value = State.Failed(tr(R.string.s_koneksi_ke_terputus, ssid))
             }
         }
         try {
             manager.requestNetwork(request, cb, 30_000)
             callback = cb
         } catch (e: Exception) {
-            _state.value = State.Failed(e.message ?: "Permintaan Wi-Fi ditolak")
+            _state.value = State.Failed(e.message ?: tr(R.string.s_permintaan_wi_fi_ditolak))
         }
     }
 

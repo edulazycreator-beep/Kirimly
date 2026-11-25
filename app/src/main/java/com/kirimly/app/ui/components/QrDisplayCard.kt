@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.components
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.animation.AnimatedContent
@@ -81,7 +83,7 @@ fun QrDisplayCard(
                     onClick = { onModeChange(QrMode.SERVER_URL) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                     icon = { Icon(Icons.Rounded.Language, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                ) { Text("URL Safari") }
+                ) { Text(tr(R.string.s_url_safari)) }
                 SegmentedButton(
                     selected = mode == QrMode.WIFI_HOTSPOT,
                     onClick = { onModeChange(QrMode.WIFI_HOTSPOT) },
@@ -110,7 +112,7 @@ fun QrDisplayCard(
                             textAlign = TextAlign.Center
                         )
                     } else if (target == QrMode.SERVER_URL) {
-                        QrPlaceholder(text = "Aktifkan server untuk menampilkan QR")
+                        QrPlaceholder(text = tr(R.string.s_aktifkan_server_untuk_menampilkan_qr))
                     }
                     if (target == QrMode.WIFI_HOTSPOT) hotspotContent()
                 }
@@ -137,7 +139,7 @@ fun QrCodeImage(content: String, modifier: Modifier = Modifier) {
         if (image != null) {
             Image(
                 bitmap = image,
-                contentDescription = "Kode QR",
+                contentDescription = tr(R.string.s_kode_qr),
                 filterQuality = FilterQuality.None,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f)
             )

@@ -1,5 +1,8 @@
 package com.kirimly.app.data.model
 
+import com.kirimly.app.util.tr
+import com.kirimly.app.R
+import androidx.annotation.StringRes
 import android.net.Uri
 
 /** Direction of a transfer relative to this device. */
@@ -9,10 +12,12 @@ enum class TransferDirection { SENT, RECEIVED }
 enum class TransferStatus { QUEUED, AWAITING_APPROVAL, IN_PROGRESS, COMPLETED, FAILED, DECLINED }
 
 /** App theme mode preference. */
-enum class ThemeMode(val displayName: String) {
-    SYSTEM("Sistem"),
-    LIGHT("Terang"),
-    DARK("Gelap");
+enum class ThemeMode(@StringRes private val labelRes: Int) {
+    SYSTEM(R.string.theme_system),
+    LIGHT(R.string.theme_light),
+    DARK(R.string.theme_dark);
+
+    val displayName: String get() = tr(labelRes)
 
     companion object {
         fun fromName(name: String?): ThemeMode = entries.firstOrNull { it.name == name } ?: DARK
@@ -34,10 +39,12 @@ enum class AppPalette(val displayName: String, val previewArgb: Long) {
 }
 
 /** History filter for the Riwayat screen. */
-enum class HistoryFilter(val displayName: String) {
-    ALL("Semua"),
-    RECEIVED("Diterima"),
-    SENT("Dikirim")
+enum class HistoryFilter(@StringRes private val labelRes: Int) {
+    ALL(R.string.filter_all),
+    RECEIVED(R.string.filter_received),
+    SENT(R.string.filter_sent);
+
+    val displayName: String get() = tr(labelRes)
 }
 
 /** Which QR the Receive screen is showing. */

@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.screens
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -82,27 +84,27 @@ fun OnboardingScreen(onFinish: () -> Unit) {
     val pages = remember {
         listOf(
             OnboardingPage(
-                eyebrow = "Selamat datang",
-                title = "Kirim file antar Android dan iPhone, tanpa kabel.",
-                body = "Kirimly bekerja di jaringan lokal: Wi-Fi yang sama atau hotspot dari HP ini. Tidak perlu internet, tidak perlu akun.",
+                eyebrow = tr(R.string.s_selamat_datang),
+                title = tr(R.string.s_kirim_file_antar_android_dan),
+                body = tr(R.string.s_kirimly_bekerja_di_jaringan_lokal),
                 illustration = { AnimatedKirimlyMark(modifier = Modifier.size(220.dp)) }
             ),
             OnboardingPage(
                 eyebrow = "iPhone & iPad",
-                title = "iPhone cukup pindai QR, lalu buka di Safari.",
-                body = "Nyalakan server di tab Terima. iPhone memindai QR dengan Kamera dan bisa mengirim atau mengunduh file tanpa memasang aplikasi.",
+                title = tr(R.string.s_iphone_cukup_pindai_qr_lalu),
+                body = tr(R.string.s_nyalakan_server_di_tab_terima),
                 illustration = { QrScanIllustration() }
             ),
             OnboardingPage(
-                eyebrow = "Keamanan",
-                title = "Setiap kiriman butuh PIN dan persetujuanmu.",
-                body = "Perangkat lain memasukkan PIN 4 digit dari layar Terima. Kamu tetap memilih Terima atau Tolak untuk setiap kiriman yang masuk.",
+                eyebrow = tr(R.string.s_keamanan),
+                title = tr(R.string.s_setiap_kiriman_butuh_pin_dan),
+                body = tr(R.string.s_perangkat_lain_memasukkan_pin_4),
                 illustration = { PinIllustration() }
             ),
             OnboardingPage(
-                eyebrow = "Android ke Android",
-                title = "Perangkat Kirimly terdekat muncul di radar.",
-                body = "Tambahkan file ke antrean di tab Kirim, lalu ketuk perangkat tujuan. File yang diterima tersimpan di Downloads/Kirimly.",
+                eyebrow = tr(R.string.s_android_ke_android),
+                title = tr(R.string.s_perangkat_kirimly_terdekat_muncul_di),
+                body = tr(R.string.s_tambahkan_file_ke_antrean_di),
                 illustration = { RadarIllustration() }
             )
         )
@@ -135,7 +137,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 modifier = Modifier.weight(1f)
             )
             AnimatedVisibility(visible = !isLast, enter = fadeIn(), exit = fadeOut()) {
-                TextButton(onClick = onFinish) { Text("Lewati") }
+                TextButton(onClick = onFinish) { Text(tr(R.string.s_lewati)) }
             }
         }
 
@@ -190,7 +192,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
                     .weight(1f)
-                    .semantics { contentDescription = "Halaman ${pagerState.currentPage + 1} dari ${pages.size}" }
+                    .semantics { contentDescription = tr(R.string.s_halaman_dari, pagerState.currentPage + 1, pages.size) }
             ) {
                 pages.indices.forEach { index ->
                     val selected = index == pagerState.currentPage
@@ -219,7 +221,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
                     label = "cta"
                 ) { last ->
-                    Text(if (last) "Mulai sekarang" else "Lanjut")
+                    Text(if (last) tr(R.string.s_mulai_sekarang) else tr(R.string.s_lanjut))
                 }
             }
         }
@@ -323,7 +325,7 @@ private fun PinIllustration() {
                         tint = MaterialTheme.colorScheme.tertiary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Kiriman disetujui", style = MaterialTheme.typography.titleSmall)
+                    Text(tr(R.string.s_kiriman_disetujui), style = MaterialTheme.typography.titleSmall)
                 }
             }
         }
@@ -356,7 +358,7 @@ private fun RadarIllustration() {
             .widthIn(max = 320.dp)
             .fillMaxWidth()
             .fillMaxHeight()
-            .semantics { contentDescription = "Contoh radar dengan perangkat fiktif" },
+            .semantics { contentDescription = tr(R.string.s_contoh_radar_dengan_perangkat_fiktif) },
         contentAlignment = Alignment.Center
     ) {
         RadarPulseCanvas(

@@ -1,5 +1,7 @@
 package com.kirimly.app.ui.components
 
+import com.kirimly.app.R
+import com.kirimly.app.util.tr
 import androidx.compose.ui.unit.sp
 import com.kirimly.app.ui.theme.MonoDigits
 import androidx.compose.runtime.mutableStateOf
@@ -93,13 +95,13 @@ fun ApprovalBottomSheet(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "${request.deviceName} ingin mengirim",
+                        text = tr(R.string.s_ingin_mengirim, request.deviceName),
                         style = MaterialTheme.typography.titleLarge,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${request.files.size} file • ${NetworkUtils.formatFileSize(request.totalSize)} • ${request.remoteAddress}",
+                        text = tr(R.string.s_file, request.files.size, NetworkUtils.formatFileSize(request.totalSize), request.remoteAddress),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -150,7 +152,7 @@ fun ApprovalBottomSheet(
                     }
                     if (request.files.size > MAX_VISIBLE) {
                         Text(
-                            text = "…dan ${request.files.size - MAX_VISIBLE} file lainnya",
+                            text = tr(R.string.s_dan_file_lainnya, request.files.size - MAX_VISIBLE),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
@@ -166,10 +168,10 @@ fun ApprovalBottomSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Kode verifikasi", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr(R.string.s_kode_verifikasi), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(code, style = MonoDigits.copy(fontSize = 28.sp))
                         Text(
-                            "Pastikan sama dengan kode di layar pengirim sebelum menerima.",
+                            tr(R.string.s_pastikan_sama_dengan_kode_di),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -178,8 +180,8 @@ fun ApprovalBottomSheet(
             }
 
             Text(
-                text = (if (request.channel == "nearby") "Lewat Nearby (Bluetooth + Wi-Fi Direct) • " else "Perangkat: ") +
-                    request.userAgent.ifBlank { "Tidak diketahui" },
+                text = (if (request.channel == "nearby") tr(R.string.s_lewat_nearby_bluetooth_wi_fi) else "Perangkat: ") +
+                    request.userAgent.ifBlank { tr(R.string.s_tidak_diketahui) },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -194,7 +196,7 @@ fun ApprovalBottomSheet(
                     drawStopIndicator = {}
                 )
                 Text(
-                    text = "Otomatis ditolak dalam ${remainingMs / 1000} detik",
+                    text = tr(R.string.s_otomatis_ditolak_dalam_detik, remainingMs / 1000),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -209,9 +211,9 @@ fun ApprovalBottomSheet(
                 ) {
                     Checkbox(checked = trust, onCheckedChange = null)
                     Column(modifier = Modifier.padding(start = 8.dp)) {
-                        Text("Percayai perangkat ini", style = MaterialTheme.typography.titleSmall)
+                        Text(tr(R.string.s_percayai_perangkat_ini), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "Kiriman berikutnya dari ${request.deviceName} diterima otomatis tanpa PIN.",
+                            tr(R.string.s_kiriman_berikutnya_dari_diterima_otomatis, request.deviceName),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -225,13 +227,13 @@ fun ApprovalBottomSheet(
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp)
-                ) { Text("Tolak") }
+                ) { Text(tr(R.string.s_tolak)) }
                 Button(
                     onClick = { onAccept(trust) },
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp)
-                ) { Text("Terima") }
+                ) { Text(tr(R.string.s_terima)) }
             }
             Spacer(Modifier.height(4.dp))
         }
