@@ -324,8 +324,8 @@ private fun ExitConfirmDialog(
                 Button(onClick = { onExit(false) }) { Text("Keluar") }
             }
         },
-        dismissButton = if (serverRunning) null else @Composable {
-            TextButton(onClick = onDismiss) { Text("Batal") }
+        dismissButton = {
+            if (!serverRunning) TextButton(onClick = onDismiss) { Text("Batal") }
         }
     )
 }

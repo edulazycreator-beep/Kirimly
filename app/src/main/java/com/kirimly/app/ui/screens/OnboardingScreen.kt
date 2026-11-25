@@ -308,14 +308,14 @@ private fun PinIllustration() {
                         )
                         .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 ) {
-                    AnimatedVisibility(visible = filled, enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut()) {
+                    androidx.compose.animation.AnimatedVisibility(visible = filled, enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut()) {
                         Text(digit.toString(), style = MonoDigits.copy(fontSize = 28.sp, letterSpacing = 0.sp))
                     }
                 }
             }
         }
         Box(modifier = Modifier.height(40.dp), contentAlignment = Alignment.Center) {
-            AnimatedVisibility(visible = approved, enter = fadeIn() + scaleIn(initialScale = 0.8f), exit = fadeOut()) {
+            androidx.compose.animation.AnimatedVisibility(visible = approved, enter = fadeIn() + scaleIn(initialScale = 0.8f), exit = fadeOut()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Rounded.CheckCircle,
