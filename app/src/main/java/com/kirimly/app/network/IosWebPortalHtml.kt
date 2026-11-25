@@ -184,9 +184,45 @@ textarea:focus, input.field:focus { border-color: var(--text); }
 label.btn { display: block; text-align: center; }
 .actions .btn { flex: 1; }
 a.btn { text-align: center; text-decoration: none; display: block; }
+
+/* ---------- Intro animation (about 6 s) ---------- */
+.splash { position: fixed; inset: 0; z-index: 100; background: #000000; display: flex; align-items: center; justify-content: center; transition: opacity .6s ease, visibility .6s ease; cursor: pointer; }
+.splash.hide { opacity: 0; visibility: hidden; }
+.splash-inner { text-align: center; padding: 24px; }
+.splash-mark { width: 132px; height: 132px; overflow: visible; display: block; margin: 0 auto; }
+.sp-plane { transform-box: fill-box; transform-origin: 50% 50%; animation: spGlide 1.2s cubic-bezier(.2, 1.4, .4, 1) both, spFloat 2.4s ease-in-out 1.4s infinite alternate; }
+.sp-trail { fill: none; stroke: #5c5c5c; stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 20; stroke-dashoffset: 20; animation: spDraw .8s ease .9s forwards; }
+.splash-word { display: flex; justify-content: center; font-size: 44px; font-weight: 500; letter-spacing: -1px; margin-top: 6px; color: var(--text); }
+.splash-word span { display: inline-block; opacity: 0; transform: translateY(14px); animation: spRise .6s cubic-bezier(.2, .8, .2, 1) forwards; animation-delay: calc(1.4s + var(--i) * 70ms); }
+.splash-tag { color: var(--muted); margin: 8px 0 0; opacity: 0; animation: spFade .6s ease 2.2s forwards; }
+.splash-bar { width: 160px; height: 2px; background: var(--hairline); margin: 30px auto 0; overflow: hidden; opacity: 0; animation: spFade .3s ease 2.8s forwards; }
+.splash-bar span { display: block; height: 100%; width: 0; background: var(--text); animation: spFill 2.7s ease-in-out 3s forwards; }
+.splash-bar.ok span { background: var(--status); }
+.splash-status { font-size: 13px; color: var(--muted); margin: 12px 0 0; min-height: 18px; opacity: 0; animation: spFade .4s ease 3s forwards; }
+.splash-skip { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 24px); text-align: center; font-size: 12px; color: #5c5c5c; opacity: 0; animation: spFade .4s ease 1.6s forwards; }
+@keyframes spGlide { from { transform: translate(-30px, 26px) scale(.5) rotate(-14deg); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
+@keyframes spFloat { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+@keyframes spDraw { to { stroke-dashoffset: 0; } }
+@keyframes spRise { to { opacity: 1; transform: none; } }
+@keyframes spFade { to { opacity: 1; } }
+@keyframes spFill { to { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .splash * { animation-duration: .01s !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; } }
 </style>
 </head>
 <body>
+<div id="splash" class="splash" role="presentation">
+  <div class="splash-inner">
+    <svg class="splash-mark" viewBox="0 0 108 108" aria-hidden="true">
+      <path class="sp-trail" d="M30,66 C35,70 41,71 46,69"/>
+      <g class="sp-plane"><path d="M34,52.5 L74,36 L60.5,76 L52.5,59.5 Z" fill="#F9F8F9"/><path d="M52.5,59.5 L74,36 L56.5,63.5 Z" fill="#8C8C8B"/></g>
+    </svg>
+    <div class="splash-word" aria-label="Kirimly"><span style="--i:0">K</span><span style="--i:1">i</span><span style="--i:2">r</span><span style="--i:3">i</span><span style="--i:4">m</span><span style="--i:5">l</span><span style="--i:6">y</span></div>
+    <p class="splash-tag">Kirim file tanpa kabel.</p>
+    <div class="splash-bar" id="splashBar"><span></span></div>
+    <p id="splashStatus" class="splash-status" aria-live="polite">Menghubungkan ke Android…</p>
+  </div>
+  <p class="splash-skip">Ketuk untuk lewati</p>
+</div>
 <header class="hero">
   <div class="hero-inner">
     <div class="brand">
@@ -309,6 +345,11 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   /* The Android app writes its own language into <html lang>, so the page always matches the app. */
   var LANG = (document.documentElement.getAttribute('lang') || 'id').toLowerCase().indexOf('en') === 0 ? 'en' : 'id';
   var EN = {
+    'Kirim file tanpa kabel.': 'Send files without cables.',
+    'Menghubungkan ke Android…': 'Connecting to Android…',
+    'Ketuk untuk lewati': 'Tap to skip',
+    'Terhubung ke ': 'Connected to ',
+    'Mencari Android…': 'Looking for Android…',
     'Kirim ke Android': 'Send to Android',
     'Terima dari Android': 'Receive from Android',
     'Ambil file yang dibagikan dari Android.': 'Get files shared from Android.',
@@ -650,6 +691,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     api('GET', '/api/info').then(function (res) {
       state.info = res.data || {};
       el('deviceName').textContent = state.info.deviceName || 'Android';
+      splashStatus(T('Terhubung ke ') + (state.info.deviceName || 'Android'), true);
       document.title = 'Kirimly • ' + (state.info.deviceName || 'Android');
       if (!state.info.pinRequired || state.info.trusted) { afterAuth(); return; }
       var candidate = pinFromFragment() || storeGet('kirimly_pin') || '';
@@ -659,6 +701,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
         showPin();
       }
     }).catch(function () {
+      splashStatus(T('Mencari Android…'), false);
       toast(T('Tidak dapat terhubung ke Android. Pastikan server aktif.'), 'err');
       setTimeout(loadInfo, 4000);
     });
@@ -1260,6 +1303,29 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   }
   el('tabSend').addEventListener('click', function () { showTab('send'); });
   el('tabReceive').addEventListener('click', function () { showTab('receive'); loadShared(); });
+
+  /* ---------- Intro animation: about 6 s, tap to skip ---------- */
+  var splashDone = false;
+  function endSplash() {
+    if (splashDone) return;
+    splashDone = true;
+    var sp = el('splash');
+    if (!sp) return;
+    sp.className = 'splash hide';
+    setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 700);
+    var first = document.querySelector('#pinModal.show input');
+    if (first) first.focus();
+  }
+  function splashStatus(text, ok) {
+    var st = el('splashStatus');
+    if (!st) return;
+    st.textContent = text;
+    var bar = el('splashBar');
+    if (bar && ok) bar.className = 'splash-bar ok';
+  }
+  setTimeout(endSplash, 6000);
+  el('splash').addEventListener('click', endSplash);
+  document.addEventListener('keydown', function (e) { if (!splashDone && (e.key === 'Escape' || e.key === 'Enter')) endSplash(); });
 
   /* ---------- Boot ---------- */
   translatePage();
