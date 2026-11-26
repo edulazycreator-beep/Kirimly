@@ -28,7 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -91,7 +91,7 @@ fun ReceiveScreen(
                 title = { Text(tr(R.string.u_receive_title), style = MaterialTheme.typography.headlineSmall) },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Palette, contentDescription = tr(R.string.u_settings))
+                        Icon(Icons.Rounded.Settings, contentDescription = tr(R.string.u_settings))
                     }
                 },
                 scrollBehavior = scrollBehavior

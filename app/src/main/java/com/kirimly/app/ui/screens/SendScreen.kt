@@ -24,7 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PhoneIphone
 import androidx.compose.material.icons.rounded.TextFields
@@ -127,7 +127,7 @@ fun SendScreen(
                 title = { Text(tr(R.string.u_send_title), style = MaterialTheme.typography.headlineSmall) },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Palette, contentDescription = tr(R.string.u_settings))
+                        Icon(Icons.Rounded.Settings, contentDescription = tr(R.string.u_settings))
                     }
                 },
                 scrollBehavior = scrollBehavior

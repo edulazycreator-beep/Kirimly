@@ -38,7 +38,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
@@ -119,7 +119,7 @@ fun HistoryScreen(
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Palette, contentDescription = tr(R.string.s_tema_palet_warna))
+                        Icon(Icons.Rounded.Settings, contentDescription = tr(R.string.u_settings))
                     }
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
