@@ -34,13 +34,10 @@
             android:textSize="15sp"
             android:textStyle="bold" />
 
-        <View
-            android:layout_width="8dp"
-            android:layout_height="1dp" />
-
         <TextView
             android:id="@+id/widget_receive"
             android:layout_width="0dp"
+            android:layout_marginStart="8dp"
             android:layout_height="44dp"
             android:layout_weight="1"
             android:background="@drawable/widget_pill_outline"
