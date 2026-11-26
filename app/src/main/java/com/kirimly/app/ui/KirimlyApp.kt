@@ -110,6 +110,7 @@ fun KirimlyApp(viewModel: MainViewModel) {
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val proPrice by viewModel.proPrice.collectAsStateWithLifecycle()
     val proStatus by viewModel.proStatus.collectAsStateWithLifecycle()
+    val trialRemainingMs by viewModel.trialRemainingMs.collectAsStateWithLifecycle()
     val crashLogCount by viewModel.crashLogCount.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var permissionsAsked by rememberSaveable { mutableStateOf(false) }
@@ -137,6 +138,17 @@ fun KirimlyApp(viewModel: MainViewModel) {
 
     // ---- Server on by default while the app is open (can be turned off in settings) ----
     LaunchedEffect(Unit) { viewModel.ensureServerRunning() }
+
+    // One-off prompts: free Pro trial after the 5th transfer, Play review after the 3rd.
+    var showTrialOffer by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        viewModel.prompts.collect { prompt ->
+            when (prompt) {
+                MainViewModel.Prompt.TRIAL_OFFER -> showTrialOffer = true
+                MainViewModel.Prompt.REVIEW -> (context as? Activity)?.let(::requestPlayReview)
+            }
+        }
+    }
 
     // ---- One-shot UI events ----
     LaunchedEffect(Unit) {
@@ -305,6 +317,22 @@ fun KirimlyApp(viewModel: MainViewModel) {
             onOpenPro = { showPro = true },
             onPortalNameChange = viewModel::setPortalName,
             onClipboardSyncChange = viewModel::setClipboardSync,
+            onAddTile = if (Build.VERSION.SDK_INT >= 33) {
+                {
+                    try {
+                        context.getSystemService(android.app.StatusBarManager::class.java)?.requestAddTileService(
+                            android.content.ComponentName(context, com.kirimly.app.service.ReceiveTileService::class.java),
+                            context.getString(R.string.tile_label),
+                            android.graphics.drawable.Icon.createWithResource(context, R.drawable.ic_stat_kirimly),
+                            context.mainExecutor
+                        ) { }
+                    } catch (_: Exception) {
+                        viewModel.showMessage(tr(R.string.t_shortcuts_body_manual))
+                    }
+                }
+            } else {
+                null
+            },
             crashLogCount = crashLogCount,
             onShareCrashLogs = {
                 scope.launch {
@@ -330,9 +358,26 @@ fun KirimlyApp(viewModel: MainViewModel) {
     }
 
     // ---- Kirimly Pro ----
+    if (showTrialOffer) {
+        AlertDialog(
+            onDismissRequest = { showTrialOffer = false },
+            title = { Text(tr(R.string.t_offer_title)) },
+            text = { Text(tr(R.string.t_offer_body)) },
+            confirmButton = {
+                Button(onClick = {
+                    showTrialOffer = false
+                    viewModel.startTrial()
+                }) { Text(tr(R.string.t_offer_start)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTrialOffer = false }) { Text(tr(R.string.t_offer_later)) }
+            }
+        )
+    }
     if (showPro) {
         ProSheet(
-            isPro = isPro,
+            isPro = preferences.isPaidPro,
+            trialRemainingMs = trialRemainingMs,
             price = proPrice,
             status = proStatus,
             debugPro = preferences.debugPro,
@@ -409,4 +454,15 @@ private fun ExitConfirmDialog(
             if (!serverRunning) TextButton(onClick = onDismiss) { Text(tr(R.string.s_batal)) }
         }
     )
+}
+
+/** Google Play In-App Review: Play decides whether the card actually appears (quota), never blocks. */
+private fun requestPlayReview(activity: Activity) {
+    try {
+        val manager = com.google.android.play.core.review.ReviewManagerFactory.create(activity)
+        manager.requestReviewFlow().addOnCompleteListener { task ->
+            if (task.isSuccessful) manager.launchReviewFlow(activity, task.result)
+        }
+    } catch (_: Exception) {
+    }
 }

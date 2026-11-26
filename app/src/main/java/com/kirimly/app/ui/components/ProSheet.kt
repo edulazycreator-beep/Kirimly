@@ -61,6 +61,7 @@ private val proFeatures = listOf(
 @Composable
 fun ProSheet(
     isPro: Boolean,
+    trialRemainingMs: Long?,
     price: String?,
     status: ProManager.Status,
     debugPro: Boolean,
@@ -142,6 +143,15 @@ fun ProSheet(
                 )
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (trialRemainingMs != null) {
+                        Text(
+                            tr(R.string.t_trial_left, formatRemaining(trialRemainingMs)),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Button(
                         onClick = onBuy,
                         enabled = status == ProManager.Status.READY && price != null,
@@ -215,5 +225,15 @@ fun ProBadge(modifier: Modifier = Modifier, locked: Boolean = false) {
             Spacer(Modifier.size(3.dp))
         }
         Text("PRO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** "2 hari" / "5 jam" / "<1 jam" for the trial countdown. */
+fun formatRemaining(ms: Long): String {
+    val hours = ms / 3_600_000L
+    return when {
+        hours >= 24 -> tr(R.string.t_days, ((hours + 12) / 24).toInt())
+        hours >= 1 -> tr(R.string.t_hours, hours.toInt())
+        else -> tr(R.string.t_under_hour)
     }
 }

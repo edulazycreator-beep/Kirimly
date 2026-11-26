@@ -1,6 +1,7 @@
 package com.kirimly.app.data.prefs
 
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import android.content.Context
 import android.os.Build
 import androidx.datastore.core.DataStore
@@ -44,6 +45,9 @@ class UserPreferencesRepository(context: Context) {
         val DEBUG_PRO = booleanPreferencesKey("debug_pro")
         val CLIPBOARD_SYNC = booleanPreferencesKey("clipboard_sync")
         val PORTAL_NAME = stringPreferencesKey("portal_name")
+        val TRIAL_ENDS_AT = longPreferencesKey("trial_ends_at")
+        val TRIAL_OFFERED = booleanPreferencesKey("trial_offered")
+        val REVIEW_ASKED = booleanPreferencesKey("review_asked")
     }
 
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
@@ -66,7 +70,10 @@ class UserPreferencesRepository(context: Context) {
                 proOwned = prefs[Keys.PRO_OWNED] ?: false,
                 debugPro = prefs[Keys.DEBUG_PRO] ?: false,
                 clipboardSync = prefs[Keys.CLIPBOARD_SYNC] ?: false,
-                portalName = prefs[Keys.PORTAL_NAME].orEmpty()
+                portalName = prefs[Keys.PORTAL_NAME].orEmpty(),
+                trialEndsAt = prefs[Keys.TRIAL_ENDS_AT] ?: 0L,
+                trialOffered = prefs[Keys.TRIAL_OFFERED] ?: false,
+                reviewAsked = prefs[Keys.REVIEW_ASKED] ?: false
             )
         }
         .distinctUntilChanged()
@@ -135,6 +142,22 @@ class UserPreferencesRepository(context: Context) {
 
     suspend fun setDebugPro(enabled: Boolean) {
         dataStore.edit { it[Keys.DEBUG_PRO] = enabled }
+    }
+
+    /** Starts the 3-day trial once; later calls do nothing. */
+    suspend fun startTrial(durationMs: Long) {
+        dataStore.edit { prefs ->
+            if ((prefs[Keys.TRIAL_ENDS_AT] ?: 0L) == 0L) prefs[Keys.TRIAL_ENDS_AT] = System.currentTimeMillis() + durationMs
+            prefs[Keys.TRIAL_OFFERED] = true
+        }
+    }
+
+    suspend fun setTrialOffered() {
+        dataStore.edit { it[Keys.TRIAL_OFFERED] = true }
+    }
+
+    suspend fun setReviewAsked() {
+        dataStore.edit { it[Keys.REVIEW_ASKED] = true }
     }
 
     suspend fun setClipboardSync(enabled: Boolean) {

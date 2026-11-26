@@ -8,6 +8,15 @@ import com.kirimly.app.data.model.SharedFile
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.update
+import androidx.core.app.Person
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
+import com.kirimly.app.MainActivity
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withTimeoutOrNull
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -72,9 +81,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, UserPreferencesRepository.DEFAULT)
 
     /** Kirimly Pro (one-time Google Play purchase). */
-    val isPro: StateFlow<Boolean> = preferences
+    private val minuteTicker = flow {
+        while (true) {
+            emit(Unit)
+            delay(60_000L)
+        }
+    }
+    private val proState = combine(preferences, minuteTicker) { prefs, _ -> prefs }
+
+    /** Paid Pro or an active 3-day trial. Re-checked every minute so a trial ends on time. */
+    val isPro: StateFlow<Boolean> = proState
         .map { it.isPro }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Remaining trial time in ms while the free trial runs, otherwise null. */
+    val trialRemainingMs: StateFlow<Long?> = proState
+        .map { prefs -> if (prefs.isTrialActive) prefs.trialEndsAt - System.currentTimeMillis() else null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    enum class Prompt { TRIAL_OFFER, REVIEW }
+
+    /** One-off prompts: the trial offer after the 5th transfer, the Play review after the 3rd. */
+    private val _prompts = Channel<Prompt>(capacity = Channel.CONFLATED)
+    val prompts: Flow<Prompt> = _prompts.receiveAsFlow()
+
+    /** Direct Share asks the Send screen to collect a code for a device that needs one. */
+    private val _pinRequests = Channel<PeerDevice>(capacity = Channel.CONFLATED)
+    val pinRequests: Flow<PeerDevice> = _pinRequests.receiveAsFlow()
     val proPrice: StateFlow<String?> = container.proManager.price
     val proStatus: StateFlow<ProManager.Status> = container.proManager.status
 
@@ -194,6 +227,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             container.proManager.messages.collect { _messages.trySend(it) }
         }
+        // Prompts use the real DataStore flow (not the placeholder defaults) so they fire only once.
+        viewModelScope.launch {
+            combine(dao.observeAll().map { it.size }, container.preferences.preferencesFlow) { count, prefs -> count to prefs }
+                .collect { (count, prefs) ->
+                    when {
+                        count >= TRIAL_AFTER_TRANSFERS && !prefs.isPaidPro && !prefs.trialOffered && prefs.trialEndsAt == 0L -> {
+                            container.preferences.setTrialOffered()
+                            _prompts.trySend(Prompt.TRIAL_OFFER)
+                        }
+                        count >= REVIEW_AFTER_TRANSFERS && !prefs.reviewAsked -> {
+                            container.preferences.setReviewAsked()
+                            _prompts.trySend(Prompt.REVIEW)
+                        }
+                    }
+                }
+        }
     }
 
     // ------------------------------------------------------------------ server (always on while the app is open)
@@ -302,6 +351,104 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         intent.getStringExtra(EXTRA_OPEN_TAB)?.let { _navigation.trySend(it) }
+        // Direct Share: the person picked one of Kirimly's device shortcuts in the Android share sheet.
+        val shortcutId = intent.getStringExtra(ShortcutManagerCompat.EXTRA_SHORTCUT_ID)
+        if (shortcutId != null && (intent.action == Intent.ACTION_SEND || intent.action == Intent.ACTION_SEND_MULTIPLE)) {
+            val name = ShortcutManagerCompat.getDynamicShortcuts(getApplication())
+                .firstOrNull { it.id == shortcutId }?.shortLabel?.toString()
+            if (name != null) sendWhenVisible(name, items = null)
+        }
+    }
+
+    /**
+     * Waits (up to [FIND_PEER_TIMEOUT_MS]) for a device called [name] to show up on the network and
+     * sends to it: [items] when given (Send again), otherwise the queue (Direct Share).
+     */
+    private fun sendWhenVisible(name: String, items: List<SharedItem>?) {
+        container.nsdManager.startDiscovery()
+        _messages.trySend(tr(R.string.t_msg_looking_for, name))
+        viewModelScope.launch {
+            if (items == null) withTimeoutOrNull(5_000L) { sharedItems.first { it.isNotEmpty() } }
+            val peer = withTimeoutOrNull(FIND_PEER_TIMEOUT_MS) {
+                container.nsdManager.peers.first { list -> list.any { it.name == name } }
+            }?.firstOrNull { it.name == name }
+            if (peer == null) {
+                items?.let { serverManager.addSharedItems(it) }
+                _navigation.trySend(ROUTE_SEND)
+                _messages.trySend(tr(R.string.t_msg_not_found, name))
+                return@launch
+            }
+            if (items == null) {
+                if (peer.pinRequired) _pinRequests.trySend(peer) else sendToPeer(peer, null)
+                return@launch
+            }
+            if (_sendingPeerIds.value.isNotEmpty()) {
+                serverManager.addSharedItems(items)
+                _navigation.trySend(ROUTE_SEND)
+                return@launch
+            }
+            _sendingPeerIds.value = setOf(peer.id)
+            val result = container.peerClient.sendItems(peer, null, items, preferences.value.deviceNickname)
+            _sendingPeerIds.value = emptySet()
+            when (result) {
+                is PeerSendResult.Success -> {
+                    pushShareShortcut(peer)
+                    _messages.trySend(tr(R.string.u_msg_sent, peer.name))
+                }
+                PeerSendResult.PinRejected -> {
+                    // Needs the code: put it in the queue and let the Send screen ask for it.
+                    serverManager.addSharedItems(items)
+                    _navigation.trySend(ROUTE_SEND)
+                    _pinRequests.trySend(peer)
+                }
+                PeerSendResult.Declined -> _messages.trySend(tr(R.string.u_msg_declined, peer.name))
+                PeerSendResult.Timeout -> _messages.trySend(tr(R.string.u_msg_no_answer, peer.name))
+                is PeerSendResult.Failed -> _messages.trySend(tr(R.string.u_msg_send_failed, result.message))
+            }
+        }
+    }
+
+    /** "Send again" from history: the same file or text, to the same device. */
+    fun resendFromHistory(item: TransferItem) {
+        viewModelScope.launch {
+            val shared: SharedItem? = if (item.textContent != null) {
+                SharedText(UUID.randomUUID().toString(), item.textContent)
+            } else {
+                val uri = item.uri?.let(Uri::parse)
+                uri?.let { withContext(Dispatchers.IO) { NetworkUtils.querySharedFile(getApplication(), it) } }
+            }
+            if (shared == null) {
+                _messages.trySend(tr(R.string.t_msg_file_gone))
+                return@launch
+            }
+            sendWhenVisible(item.peerName, listOf(shared))
+        }
+    }
+
+    /**
+     * Publishes a long-lived sharing shortcut so this device appears at the top of the Android
+     * share sheet (Direct Share). Android ranks the most used ones first.
+     */
+    private fun pushShareShortcut(peer: PeerDevice) {
+        try {
+            val app = getApplication<Application>()
+            val id = SHORTCUT_PREFIX + peer.name.lowercase().filter { it.isLetterOrDigit() }.take(40).ifBlank { "device" }
+            val shortcut = ShortcutInfoCompat.Builder(app, id)
+                .setShortLabel(peer.name)
+                .setLongLived(true)
+                .setPerson(Person.Builder().setName(peer.name).setKey(id).build())
+                .setIcon(IconCompat.createWithResource(app, R.mipmap.ic_launcher))
+                .setCategories(setOf(SHARE_CATEGORY))
+                .setIntent(
+                    Intent(app, MainActivity::class.java)
+                        .setAction(Intent.ACTION_VIEW)
+                        .putExtra(EXTRA_OPEN_TAB, ROUTE_SEND)
+                )
+                .build()
+            ShortcutManagerCompat.pushDynamicShortcut(app, shortcut)
+        } catch (_: Exception) {
+            // Shortcuts are a convenience; never fail a transfer because of them.
+        }
     }
 
     // ------------------------------------------------------------------ sending
@@ -320,6 +467,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val message = when (result) {
                 is PeerSendResult.Success -> {
                     clearQueue()
+                    pushShareShortcut(peer)
                     tr(R.string.u_msg_sent, peer.name)
                 }
                 PeerSendResult.PinRejected -> tr(R.string.u_msg_wrong_code, peer.name)
@@ -358,6 +506,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     peer to result
                 }
             }.awaitAll()
+            results.filter { it.second is PeerSendResult.Success }.forEach { pushShareShortcut(it.first) }
             val ok = results.count { it.second is PeerSendResult.Success } + offered
             val needCode = results.filter { it.second == PeerSendResult.PinRejected }.map { it.first.name }
             // Safari tabs download from the queue, so it stays while they are offered it.
@@ -520,6 +669,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun buyPro(activity: Activity) = container.proManager.purchase(activity)
 
+    fun startTrial() {
+        viewModelScope.launch {
+            container.preferences.startTrial(TRIAL_DURATION_MS)
+            _messages.trySend(tr(R.string.t_msg_trial_started))
+        }
+    }
+
     fun restorePro() {
         viewModelScope.launch { container.proManager.restore() }
     }
@@ -574,6 +730,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         const val ROUTE_HISTORY = "history"
         const val EXTRA_OPEN_TAB = "open_tab"
         const val FREE_HISTORY_LIMIT = 20
+        const val TRIAL_AFTER_TRANSFERS = 5
+        const val REVIEW_AFTER_TRANSFERS = 3
+        const val TRIAL_DURATION_MS = 3L * 24 * 60 * 60 * 1000
+        private const val FIND_PEER_TIMEOUT_MS = 12_000L
+        private const val SHORTCUT_PREFIX = "peer_"
+        const val SHARE_CATEGORY = "com.kirimly.app.category.SEND_TO_DEVICE"
         private const val MAX_FOLDER_FILES = 2_000
         private const val MAX_FOLDER_DEPTH = 12
         private const val MAX_CLIP_LENGTH = 100_000

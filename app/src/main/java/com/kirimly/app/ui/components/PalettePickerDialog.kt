@@ -69,6 +69,7 @@ fun PalettePickerSheet(
     onOpenPro: () -> Unit,
     onPortalNameChange: (String) -> Unit,
     onClipboardSyncChange: (Boolean) -> Unit,
+    onAddTile: (() -> Unit)?,
     crashLogCount: Int,
     onShareCrashLogs: () -> Unit,
     onShowTutorial: () -> Unit,
@@ -118,7 +119,11 @@ fun PalettePickerSheet(
                         ProBadge()
                     }
                     Text(
-                        tr(if (isPro) R.string.p_settings_active else R.string.p_settings_cta),
+                        when {
+                            preferences.isPaidPro -> tr(R.string.p_settings_active)
+                            preferences.isTrialActive -> tr(R.string.t_trial_left, formatRemaining(preferences.trialEndsAt - System.currentTimeMillis()))
+                            else -> tr(R.string.p_settings_cta)
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -199,6 +204,17 @@ fun PalettePickerSheet(
                     }
                 } else {
                     LockedRow(text = tr(R.string.p_clip_body), onClick = onOpenPro)
+                }
+            }
+
+            Section(tr(R.string.t_shortcuts)) {
+                Text(
+                    tr(if (onAddTile != null) R.string.t_shortcuts_body else R.string.t_shortcuts_body_manual),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (onAddTile != null) {
+                    androidx.compose.material3.OutlinedButton(onClick = onAddTile) { Text(tr(R.string.t_add_tile)) }
                 }
             }
 

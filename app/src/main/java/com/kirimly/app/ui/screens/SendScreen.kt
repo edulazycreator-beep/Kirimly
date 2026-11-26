@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -98,6 +99,11 @@ fun SendScreen(
     val sending by viewModel.sendingTransfers.collectAsStateWithLifecycle()
 
     var pinTarget by remember { mutableStateOf<PeerDevice?>(null) }
+    // Direct Share / Send again to a device that asks for a code.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.pinRequests.collect { pinTarget = it }
+    }
+    var proNudgeDismissed by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var showTextDialog by remember { mutableStateOf(false) }
 
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -194,6 +200,13 @@ fun SendScreen(
                             queue.take(MAX_QUEUE_ROWS).forEach { item ->
                                 QueueRow(item = item, onRemove = { viewModel.removeItem(item.id) })
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                            if (!isPro && !proNudgeDismissed && queue.size > PRO_NUDGE_QUEUE_SIZE) {
+                                ProNudge(
+                                    text = tr(R.string.t_nudge_many_files),
+                                    onOpen = onOpenPro,
+                                    onDismiss = { proNudgeDismissed = true }
+                                )
                             }
                             if (queue.size > MAX_QUEUE_ROWS) {
                                 Text(
@@ -347,6 +360,31 @@ fun SendScreen(
 }
 
 private const val MAX_QUEUE_ROWS = 40
+private const val PRO_NUDGE_QUEUE_SIZE = 10
+
+/** A quiet, dismissible Pro suggestion shown only where it helps (e.g. many files queued). */
+@Composable
+private fun ProNudge(text: String, onOpen: () -> Unit, onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp)
+            .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ProBadge()
+            Spacer(Modifier.size(10.dp))
+            Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        }
+        Row {
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onDismiss) { Text(tr(R.string.t_nudge_hide)) }
+            TextButton(onClick = onOpen) { Text(tr(R.string.t_nudge_see)) }
+        }
+    }
+}
 
 @Composable
 internal fun StepCard(number: Int?, title: String, content: @Composable () -> Unit) {

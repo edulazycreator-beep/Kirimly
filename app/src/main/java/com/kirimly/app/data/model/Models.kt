@@ -217,9 +217,17 @@ data class UserPreferences(
     /** Pro: send copied text to remembered devices automatically when Kirimly is opened. */
     val clipboardSync: Boolean = false,
     /** Pro: name shown on the iPhone / iPad portal instead of the device name. Blank = device name. */
-    val portalName: String = ""
+    val portalName: String = "",
+    /** End of the free 3-day Pro trial (epoch ms); 0 = never started. */
+    val trialEndsAt: Long = 0L,
+    /** The trial offer was shown once (after the 5th transfer). */
+    val trialOffered: Boolean = false,
+    /** Google Play In-App Review was requested once (after the 3rd transfer). */
+    val reviewAsked: Boolean = false
 ) {
-    val isPro: Boolean get() = proOwned || (com.kirimly.app.BuildConfig.DEBUG && debugPro)
+    val isPaidPro: Boolean get() = proOwned || (com.kirimly.app.BuildConfig.DEBUG && debugPro)
+    val isTrialActive: Boolean get() = !isPaidPro && System.currentTimeMillis() < trialEndsAt
+    val isPro: Boolean get() = isPaidPro || isTrialActive
 }
 
 /** A Safari / browser tab currently connected to the portal over WebSocket. */

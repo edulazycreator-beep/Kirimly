@@ -67,7 +67,8 @@ class AppContainer(context: Context) {
             SharedFileCache.pruneStale(appContext)
         }
         appScope.launch {
-            preferences.preferencesFlow.collect { prefs ->
+            // Re-applied every minute so an ending Pro trial also switches off server-side Pro.
+            kotlinx.coroutines.flow.combine(preferences.preferencesFlow, minuteTicker()) { prefs, _ -> prefs }.collect { prefs ->
                 serverManager.updatePreferences(prefs)
                 peerClient.deviceId = prefs.deviceId
                 nsdManager.updateLocalName(prefs.deviceNickname)
@@ -83,5 +84,12 @@ class AppContainer(context: Context) {
             }
         }
         proManager.connect()
+    }
+
+    private fun minuteTicker() = kotlinx.coroutines.flow.flow {
+        while (true) {
+            emit(Unit)
+            kotlinx.coroutines.delay(60_000L)
+        }
     }
 }

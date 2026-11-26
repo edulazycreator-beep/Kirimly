@@ -121,4 +121,6 @@ dependencies {
 
     // Google Play Billing (Kirimly Pro, one-time purchase)
     implementation(libs.billing.ktx)
+    // Google Play In-App Review
+    implementation(libs.play.review)
 }

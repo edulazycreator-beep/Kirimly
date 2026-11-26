@@ -4,6 +4,7 @@ import com.kirimly.app.R
 import com.kirimly.app.util.tr
 import com.kirimly.app.ui.components.FileThumbnail
 import com.kirimly.app.ui.components.ProBadge
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
@@ -221,7 +222,8 @@ fun HistoryScreen(
                         onOpen = { openItem(context, item, viewModel) },
                         onCopy = { item.textContent?.let(viewModel::copyToClipboard) },
                         onShare = { shareItem(context, item, viewModel) },
-                        onDelete = { viewModel.deleteHistoryItem(item.id) }
+                        onDelete = { viewModel.deleteHistoryItem(item.id) },
+                        onSendAgain = { viewModel.resendFromHistory(item) }
                     )
                 }
                 if (hiddenCount > 0) {
@@ -272,7 +274,8 @@ private fun HistoryRow(
     onOpen: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSendAgain: () -> Unit
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val received = item.direction == TransferDirection.RECEIVED
@@ -334,6 +337,16 @@ private fun HistoryRow(
                         Icon(Icons.Rounded.MoreVert, contentDescription = tr(R.string.s_opsi))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        if (!received && item.peerName.isNotBlank()) {
+                            DropdownMenuItem(
+                                text = { Text(tr(R.string.t_send_again, item.peerName)) },
+                                leadingIcon = { Icon(Icons.Rounded.Replay, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onSendAgain()
+                                }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(tr(R.string.s_bagikan)) },
                             leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
