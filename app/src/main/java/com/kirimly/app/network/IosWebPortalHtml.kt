@@ -192,7 +192,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
 .clipbar .clip-text { margin: 0 0 12px; max-height: 96px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 15px; }
 .clipbar .clip-actions { display: flex; gap: 8px; justify-content: flex-end; }
 /* ---------- Intro animation (about 6 s) ---------- */
-.splash { position: fixed; inset: 0; z-index: 100; background: #000000; display: flex; align-items: center; justify-content: center; transition: opacity .6s ease, visibility .6s ease; cursor: pointer; }
+.splash { position: fixed; inset: 0; z-index: 100; background: #000000; display: flex; align-items: center; justify-content: center; transition: opacity .6s ease, visibility .6s ease; }
 .splash.hide { opacity: 0; visibility: hidden; }
 .splash-inner { text-align: center; padding: 24px; }
 .splash-mark { width: 132px; height: 132px; overflow: visible; display: block; margin: 0 auto; }
@@ -205,7 +205,6 @@ a.btn { text-align: center; text-decoration: none; display: block; }
 .splash-bar span { display: block; height: 100%; width: 0; background: var(--text); animation: spFill 2.7s ease-in-out 3s forwards; }
 .splash-bar.ok span { background: var(--status); }
 .splash-status { font-size: 13px; color: var(--muted); margin: 12px 0 0; min-height: 18px; opacity: 0; animation: spFade .4s ease 3s forwards; }
-.splash-skip { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 24px); text-align: center; font-size: 12px; color: #5c5c5c; opacity: 0; animation: spFade .4s ease 1.6s forwards; }
 @keyframes spGlide { from { transform: translate(-30px, 26px) scale(.5) rotate(-14deg); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
 @keyframes spFloat { from { transform: translateY(0); } to { transform: translateY(-5px); } }
 @keyframes spDraw { to { stroke-dashoffset: 0; } }
@@ -227,7 +226,6 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     <div class="splash-bar" id="splashBar"><span></span></div>
     <p id="splashStatus" class="splash-status" aria-live="polite">Menghubungkan ke Android…</p>
   </div>
-  <p class="splash-skip">Ketuk untuk lewati</p>
 </div>
 <header class="hero">
   <div class="hero-inner">
@@ -362,7 +360,6 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     'Tutup': 'Close',
     'Kirim file tanpa kabel.': 'Send files without cables.',
     'Menghubungkan ke Android…': 'Connecting to Android…',
-    'Ketuk untuk lewati': 'Tap to skip',
     'Terhubung ke ': 'Connected to ',
     'Mencari Android…': 'Looking for Android…',
     'Kirim ke Android': 'Send to Android',
@@ -1362,7 +1359,7 @@ a.btn { text-align: center; text-decoration: none; display: block; }
   el('tabSend').addEventListener('click', function () { showTab('send'); });
   el('tabReceive').addEventListener('click', function () { showTab('receive'); loadShared(); });
 
-  /* ---------- Intro animation: about 6 s, tap to skip ---------- */
+  /* ---------- Intro animation: about 6 s ---------- */
   var splashDone = false;
   function endSplash() {
     if (splashDone) return;
@@ -1382,8 +1379,6 @@ a.btn { text-align: center; text-decoration: none; display: block; }
     if (bar && ok) bar.className = 'splash-bar ok';
   }
   setTimeout(endSplash, 6000);
-  el('splash').addEventListener('click', endSplash);
-  document.addEventListener('keydown', function (e) { if (!splashDone && (e.key === 'Escape' || e.key === 'Enter')) endSplash(); });
 
   /* ---------- Boot ---------- */
   translatePage();
