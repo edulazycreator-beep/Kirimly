@@ -79,6 +79,8 @@ fun PalettePickerSheet(
     val focusManager = LocalFocusManager.current
     var nickname by remember(preferences.deviceNickname) { mutableStateOf(preferences.deviceNickname) }
     val isPro = preferences.isPro
+    var showAbout by remember { mutableStateOf(false) }
+    if (showAbout) AboutDialog(onDismiss = { showAbout = false })
     var portalName by remember(preferences.portalName) { mutableStateOf(preferences.portalName) }
     val saveName = {
         if (nickname.isNotBlank() && nickname != preferences.deviceNickname) onNicknameChange(nickname)
@@ -242,6 +244,7 @@ fun PalettePickerSheet(
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onShowTutorial, modifier = Modifier.fillMaxWidth()) { Text(tr(R.string.u_tutorial)) }
+                OutlinedButton(onClick = { showAbout = true }, modifier = Modifier.fillMaxWidth()) { Text(tr(R.string.a_about)) }
                 if (crashLogCount > 0) {
                     TextButton(onClick = onShareCrashLogs, modifier = Modifier.fillMaxWidth()) {
                         Text(tr(R.string.u_share_crash, crashLogCount))
@@ -314,4 +317,48 @@ private fun PaletteRow(palette: AppPalette, selected: Boolean, dark: Boolean, lo
             ProBadge(locked = true)
         }
     }
+}
+
+/** About Kirimly: version and author. */
+@Composable
+private fun AboutDialog(onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr(R.string.a_close)) } },
+        title = null,
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                AnimatedKirimlyMark(modifier = Modifier.size(72.dp))
+                Text("Kirimly", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    tr(R.string.a_version, com.kirimly.app.BuildConfig.VERSION_NAME),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    tr(R.string.a_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    tr(R.string.a_made_by),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text("Munawar Tamimi", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "© 2026 Munawar Tamimi",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    )
 }

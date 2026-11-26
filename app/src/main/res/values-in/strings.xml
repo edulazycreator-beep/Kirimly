@@ -466,4 +466,9 @@
     <string name="widget_receive">Terima</string>
     <string name="widget_label">Kirimly: Kirim &amp; Terima</string>
     <string name="widget_description">Buka Kirimly langsung ke Kirim atau Terima.</string>
+    <string name="a_about">Tentang Kirimly</string>
+    <string name="a_close">Tutup</string>
+    <string name="a_version">Versi %1$s</string>
+    <string name="a_description">Kirim file dan teks antara Android, iPhone, iPad, dan Mac lewat Wi-Fi yang sama. Tanpa kabel, tanpa internet, tanpa akun.</string>
+    <string name="a_made_by">Dibuat oleh</string>
 </resources>

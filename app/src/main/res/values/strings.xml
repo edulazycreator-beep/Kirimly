@@ -466,4 +466,9 @@
     <string name="widget_receive">Receive</string>
     <string name="widget_label">Kirimly: Send &amp; Receive</string>
     <string name="widget_description">Open Kirimly straight to Send or Receive.</string>
+    <string name="a_about">About Kirimly</string>
+    <string name="a_close">Close</string>
+    <string name="a_version">Version %1$s</string>
+    <string name="a_description">Send files and text between Android, iPhone, iPad and Mac over the same Wi-Fi. No cables, no internet, no account.</string>
+    <string name="a_made_by">Made by</string>
 </resources>
